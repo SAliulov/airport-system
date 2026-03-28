@@ -27,6 +27,9 @@ replay_pid*
 # Java
 target/
 build/
+bin/
+*.lock
+backend/.gradle/
 
 # Node
 node_modules/
@@ -42,3 +45,4 @@ node_modules/
 # Secrets
 *.env
 application-prod.yml
+AGENTS.md
