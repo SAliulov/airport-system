@@ -11,7 +11,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate        # Flyway управляет схемой, Hibernate только проверяет
+      ddl-auto: none        # Flyway управляет схемой, Hibernate только проверяет
     show-sql: true
     properties:
       hibernate:

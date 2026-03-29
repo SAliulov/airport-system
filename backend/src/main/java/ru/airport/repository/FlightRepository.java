@@ -1,0 +1,63 @@
+package ru.airport.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import ru.airport.model.Flight;
+import ru.airport.model.FlightStatus;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Репозиторий конкретных выполняемых рейсов.
+ * Центральный репозиторий системы.
+ */
+public interface FlightRepository extends JpaRepository<Flight, Integer> {
+
+    List<Flight> findByStatus(FlightStatus status);
+
+    List<Flight> findBySchedule_ScheduleId(Integer scheduleId);
+
+    /**
+     * Рейсы по статусу с плановым вылетом в указанный день.
+     * Используется для фильтрации расписания (задача 2).
+     */
+    @Query("""
+            SELECT f FROM Flight f
+            JOIN f.schedule s
+            WHERE s.scheduledDeparture >= :dayStart
+              AND s.scheduledDeparture < :dayEnd
+            ORDER BY s.scheduledDeparture
+            """)
+    List<Flight> findByDay(
+            @Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd") LocalDateTime dayEnd
+    );
+
+    /**
+     * Рейсы со статусом SCHEDULED или DELAYED,
+     * у которых плановое время вылета уже наступило.
+     * Используется планировщиком для автообновления статуса (задача 3).
+     */
+    @Query("""
+            SELECT f FROM Flight f
+            JOIN f.schedule s
+            WHERE f.status IN ('SCHEDULED', 'DELAYED')
+              AND s.scheduledDeparture <= :now
+            """)
+    List<Flight> findReadyToDeparture(@Param("now") LocalDateTime now);
+
+    /**
+     * Рейсы со статусом DEPARTED,
+     * у которых плановое время прилёта уже наступило.
+     * Используется планировщиком для автообновления статуса (задача 3).
+     */
+    @Query("""
+            SELECT f FROM Flight f
+            JOIN f.schedule s
+            WHERE f.status = 'DEPARTED'
+              AND s.scheduledArrival <= :now
+            """)
+    List<Flight> findReadyToArrive(@Param("now") LocalDateTime now);
+}

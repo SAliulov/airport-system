@@ -1,0 +1,126 @@
+package ru.airport.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Конкретный выполняемый рейс — один экземпляр из расписания.
+ *
+ * Пример: если {@link Schedule} — "SU100 каждый день",
+ * то Flight — "SU100 от 16 марта 2026".
+ *
+ * Центральная сущность системы. Через неё проходят:
+ * — автообновление статуса (@Scheduled, задача 3)
+ * — назначение гейта (задача 4)
+ * — назначение типа ВС (задача 5)
+ * — предупреждения о задержке (задача 8)
+ *
+ * НФТ Надёжность: @Version обеспечивает оптимистичную блокировку —
+ * если два диспетчера одновременно меняют один рейс,
+ * второй получит OptimisticLockException, а не молча перепишет данные.
+ *
+ * GRASP: Information Expert — FlightService работает именно с этой сущностью.
+ * GoF: Observer — изменение статуса → WebSocket-событие всем клиентам.
+ */
+@Entity
+@Table(name = "flight")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = {"schedule", "aircraftType", "gateAssignments", "delayWarnings"})
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Flight {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "flight_id")
+    @EqualsAndHashCode.Include
+    private Integer flightId;
+
+    /**
+     * Версия записи для оптимистичной блокировки (NFR — Надёжность).
+     * Hibernate автоматически инкрементирует при каждом UPDATE.
+     */
+    @Version
+    @Column(name = "version")
+    private Long version;
+
+    /**
+     * Фактическое время вылета.
+     * NULL до момента вылета самолёта.
+     */
+    @Column(name = "actual_departure")
+    private LocalDateTime actualDeparture;
+
+    /**
+     * Фактическое время прилёта.
+     * NULL до момента посадки.
+     */
+    @Column(name = "actual_arrival")
+    private LocalDateTime actualArrival;
+
+    /**
+     * Текущий статус рейса.
+     * Хранится как строка (VARCHAR(20)) — читаемо в БД без справочника.
+     * Начальное значение SCHEDULED устанавливается при создании.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    private FlightStatus status = FlightStatus.SCHEDULED;
+
+    // ───── Связи ──────────────────────────────────────────────────────────
+
+    /**
+     * Ссылка на плановое расписание.
+     * NOT NULL, ON DELETE RESTRICT.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "schedule_id", nullable = false)
+    private Schedule schedule;
+
+    /**
+     * Назначенный тип ВС.
+     * NULL пока ВС не назначено (назначается после создания рейса, задача 5).
+     * ON DELETE SET NULL — если тип ВС удалён из справочника, рейс остаётся.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "aircraft_type_id")
+    private AircraftType aircraftType;
+
+    /**
+     * История назначений гейтов на этот рейс.
+     * CASCADE REMOVE не задан на уровне JPA — каскад определён в БД (ON DELETE CASCADE).
+     */
+    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<GateAssignment> gateAssignments = new ArrayList<>();
+
+    /**
+     * Предупреждения о задержке этого рейса.
+     * Один рейс может иметь несколько записей (задача 8).
+     */
+    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<DelayWarning> delayWarnings = new ArrayList<>();
+
+    // ───── Вспомогательные методы ─────────────────────────────────────────
+
+    /**
+     * Возвращает последнее (актуальное) назначение гейта,
+     * либо null если гейт ещё не назначен.
+     * Используется в сервисном слое — не в контроллере.
+     */
+    public GateAssignment getActiveGateAssignment() {
+        if (gateAssignments == null || gateAssignments.isEmpty()) {
+            return null;
+        }
+        return gateAssignments.get(gateAssignments.size() - 1);
+    }
+}
