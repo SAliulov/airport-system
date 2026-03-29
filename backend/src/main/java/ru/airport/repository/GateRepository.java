@@ -1,6 +1,8 @@
 package ru.airport.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import ru.airport.model.Gate;
 import ru.airport.model.SizeCategory;
 
@@ -20,12 +22,23 @@ public interface GateRepository extends JpaRepository<Gate, Integer> {
     List<Gate> findByIsActiveTrue();
 
     /**
-     * Активные гейты, которые физически принимают данную категорию ВС.
-     * Используется при проверке совместимости (задача 4/5):
-     * гейт подходит если его maxSizeCategory >= категории ВС.
-     *
-     * Hibernate транслирует сравнение enum через ordinal в БД,
-     * поэтому используем явный JPQL с ordinal().
+     * Активные гейты, совместимые с категорией ВС по правилу
+     * {@link SizeCategory#isCompatible(SizeCategory, SizeCategory)}.
+     * <p>
+     * Для {@code @Enumerated(STRING)} нельзя использовать сравнение
+     * {@code GreaterThanEqual} в SQL — порядок строк не совпадает с NARROW &lt; WIDE &lt; JUMBO.
      */
-    List<Gate> findByIsActiveTrueAndMaxSizeCategoryGreaterThanEqual(SizeCategory sizeCategory);
+    @Query("""
+            SELECT g FROM Gate g
+            WHERE g.isActive = true
+              AND (
+                   g.maxSizeCategory = ru.airport.model.SizeCategory.JUMBO
+                OR (g.maxSizeCategory = ru.airport.model.SizeCategory.WIDE
+                    AND :aircraftSize IN (ru.airport.model.SizeCategory.NARROW, ru.airport.model.SizeCategory.WIDE))
+                OR (g.maxSizeCategory = ru.airport.model.SizeCategory.NARROW
+                    AND :aircraftSize = ru.airport.model.SizeCategory.NARROW)
+              )
+            ORDER BY g.gateNumber
+            """)
+    List<Gate> findActiveGatesCompatibleWithAircraftSize(@Param("aircraftSize") SizeCategory aircraftSize);
 }

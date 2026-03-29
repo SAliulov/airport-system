@@ -56,7 +56,7 @@ public class Gate {
      * Хранится как строка в БД (VARCHAR(10)).
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "max_size_category", length = 10)
+    @Column(name = "max_size_category", length = 10, nullable = false)
     private SizeCategory maxSizeCategory;
 
     // ───── Связи ──────────────────────────────────────────────────────────

@@ -1,0 +1,2 @@
+# Не используется, пока нет @ActiveProfiles("test") или spring.profiles.active=test.
+# AirportJpaRepositoriesIT задаёт datasource через @DynamicPropertySource (Testcontainers).

@@ -96,24 +96,29 @@ public class Flight {
 
     /**
      * История назначений гейтов на этот рейс.
-     * CASCADE REMOVE не задан на уровне JPA — каскад определён в БД (ON DELETE CASCADE).
+     * Без orphanRemoval: смена гейта — только добавление новой записи; очистка коллекции не удаляет историю из БД.
+     * При удалении рейса дочерние назначения удаляются каскадом (JPA REMOVE + ON DELETE CASCADE в БД).
      */
-    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY,
+            cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE })
+    @OrderBy("assignmentId ASC")
     @Builder.Default
     private List<GateAssignment> gateAssignments = new ArrayList<>();
 
     /**
      * Предупреждения о задержке этого рейса.
-     * Один рейс может иметь несколько записей (задача 8).
+     * Без orphanRemoval — несколько записей во времени; не удалять историю при манипуляциях с коллекцией.
      */
-    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY,
+            cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE })
+    @OrderBy("createdAt ASC")
     @Builder.Default
     private List<DelayWarning> delayWarnings = new ArrayList<>();
 
     // ───── Вспомогательные методы ─────────────────────────────────────────
 
     /**
-     * Возвращает последнее (актуальное) назначение гейта,
+     * Возвращает последнее (актуальное) назначение гейта по порядку {@code assignmentId},
      * либо null если гейт ещё не назначен.
      * Используется в сервисном слое — не в контроллере.
      */

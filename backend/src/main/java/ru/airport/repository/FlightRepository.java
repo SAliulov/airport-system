@@ -7,6 +7,8 @@ import ru.airport.model.Flight;
 import ru.airport.model.FlightStatus;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -43,10 +45,16 @@ public interface FlightRepository extends JpaRepository<Flight, Integer> {
     @Query("""
             SELECT f FROM Flight f
             JOIN f.schedule s
-            WHERE f.status IN ('SCHEDULED', 'DELAYED')
+            WHERE f.status IN (:departureStatuses)
               AND s.scheduledDeparture <= :now
             """)
-    List<Flight> findReadyToDeparture(@Param("now") LocalDateTime now);
+    List<Flight> findReadyToDeparture(
+            @Param("now") LocalDateTime now,
+            @Param("departureStatuses") Collection<FlightStatus> departureStatuses);
+
+    default List<Flight> findReadyToDeparture(LocalDateTime now) {
+        return findReadyToDeparture(now, EnumSet.of(FlightStatus.SCHEDULED, FlightStatus.DELAYED));
+    }
 
     /**
      * Рейсы со статусом DEPARTED,
@@ -56,8 +64,14 @@ public interface FlightRepository extends JpaRepository<Flight, Integer> {
     @Query("""
             SELECT f FROM Flight f
             JOIN f.schedule s
-            WHERE f.status = 'DEPARTED'
+            WHERE f.status = :status
               AND s.scheduledArrival <= :now
             """)
-    List<Flight> findReadyToArrive(@Param("now") LocalDateTime now);
+    List<Flight> findReadyToArrive(
+            @Param("now") LocalDateTime now,
+            @Param("status") FlightStatus status);
+
+    default List<Flight> findReadyToArrive(LocalDateTime now) {
+        return findReadyToArrive(now, FlightStatus.DEPARTED);
+    }
 }

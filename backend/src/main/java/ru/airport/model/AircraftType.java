@@ -46,7 +46,7 @@ public class AircraftType {
      * добавлять новые категории без миграции схемы.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "size_category", length = 10)
+    @Column(name = "size_category", length = 10, nullable = false)
     private SizeCategory sizeCategory;
 
     // ───── Связи ──────────────────────────────────────────────────────────
