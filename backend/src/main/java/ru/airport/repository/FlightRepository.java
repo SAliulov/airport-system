@@ -74,4 +74,21 @@ public interface FlightRepository extends JpaRepository<Flight, Integer> {
     default List<Flight> findReadyToArrive(LocalDateTime now) {
         return findReadyToArrive(now, FlightStatus.DEPARTED);
     }
+
+    /**
+     * Рейсы, у которых плановый вылет в указанные сутки; опционально по статусу.
+     * Для {@code GET /flights} и фильтрации расписания (задача 2).
+     */
+    @Query("""
+            SELECT f FROM Flight f JOIN f.schedule s
+            WHERE s.scheduledDeparture >= :dayStart
+              AND s.scheduledDeparture < :dayEnd
+              AND (:status IS NULL OR f.status = :status)
+            ORDER BY s.scheduledDeparture
+            """)
+    List<Flight> findByScheduleDayAndOptionalStatus(
+            @Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd") LocalDateTime dayEnd,
+            @Param("status") FlightStatus status
+    );
 }

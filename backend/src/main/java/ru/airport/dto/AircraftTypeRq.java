@@ -1,0 +1,34 @@
+package ru.airport.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import ru.airport.model.SizeCategory;
+
+/**
+ * Тело запроса: создание или обновление типа ВС.
+ * Задача 1; REST: {@code POST /api/v1/aircraft-types}, {@code PUT /api/v1/aircraft-types/{id}}.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AircraftTypeRq {
+
+    @NotBlank
+    @Size(max = 4)
+    private String icaoCode;
+
+    @PositiveOrZero
+    private Integer passengerCapacity;
+
+    @NotNull
+    private SizeCategory sizeCategory;
+}

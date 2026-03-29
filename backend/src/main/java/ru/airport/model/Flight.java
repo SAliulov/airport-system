@@ -19,10 +19,6 @@ import java.util.List;
  * — назначение типа ВС (задача 5)
  * — предупреждения о задержке (задача 8)
  *
- * НФТ Надёжность: @Version обеспечивает оптимистичную блокировку —
- * если два диспетчера одновременно меняют один рейс,
- * второй получит OptimisticLockException, а не молча перепишет данные.
- *
  * GRASP: Information Expert — FlightService работает именно с этой сущностью.
  * GoF: Observer — изменение статуса → WebSocket-событие всем клиентам.
  */
@@ -42,14 +38,6 @@ public class Flight {
     @Column(name = "flight_id")
     @EqualsAndHashCode.Include
     private Integer flightId;
-
-    /**
-     * Версия записи для оптимистичной блокировки (NFR — Надёжность).
-     * Hibernate автоматически инкрементирует при каждом UPDATE.
-     */
-    @Version
-    @Column(name = "version")
-    private Long version;
 
     /**
      * Фактическое время вылета.

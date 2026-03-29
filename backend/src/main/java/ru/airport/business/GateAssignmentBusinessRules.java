@@ -1,0 +1,50 @@
+package ru.airport.business;
+
+import org.springframework.stereotype.Component;
+import ru.airport.exception.ConflictException;
+import ru.airport.model.AircraftType;
+import ru.airport.model.Gate;
+import ru.airport.model.GateAssignment;
+import ru.airport.model.SizeCategory;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Правила назначения гейта: интервал времени, активность гейта, отсутствие пересечений, размер ВС.
+ */
+@Component
+public class GateAssignmentBusinessRules {
+
+    public void assertValidInterval(LocalDateTime from, LocalDateTime to) {
+        if (from == null || to == null || !from.isBefore(to)) {
+            throw new ConflictException(
+                    "Интервал назначения гейта некорректен: assigned_from должен быть строго раньше assigned_to");
+        }
+    }
+
+    public void assertGateIsActive(Gate gate) {
+        if (!Boolean.TRUE.equals(gate.getIsActive())) {
+            throw new ConflictException("Гейт неактивен: " + gate.getGateNumber());
+        }
+    }
+
+    public void assertNoOverlaps(List<GateAssignment> overlaps) {
+        if (overlaps != null && !overlaps.isEmpty()) {
+            throw new ConflictException("Гейт занят в указанный интервал времени (пересечение с другим рейсом)");
+        }
+    }
+
+    /**
+     * Если тип ВС ещё не назначен на рейс, проверка пропускается.
+     */
+    public void assertAircraftFitsGate(AircraftType aircraft, Gate gate) {
+        if (aircraft == null) {
+            return;
+        }
+        if (!SizeCategory.isCompatible(aircraft.getSizeCategory(), gate.getMaxSizeCategory())) {
+            throw new ConflictException(
+                    "Категория размера ВС несовместима с гейтом " + gate.getGateNumber());
+        }
+    }
+}
