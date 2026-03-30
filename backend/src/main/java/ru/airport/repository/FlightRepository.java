@@ -1,6 +1,7 @@
 package ru.airport.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.airport.model.Flight;
@@ -15,7 +16,9 @@ import java.util.List;
  * Репозиторий конкретных выполняемых рейсов.
  * Центральный репозиторий системы.
  */
-public interface FlightRepository extends JpaRepository<Flight, Integer> {
+public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpecificationExecutor<Flight> {
+
+    boolean existsBySchedule_ScheduleId(Integer scheduleId);
 
     List<Flight> findByStatus(FlightStatus status);
 
@@ -76,19 +79,15 @@ public interface FlightRepository extends JpaRepository<Flight, Integer> {
     }
 
     /**
-     * Рейсы, у которых плановый вылет в указанные сутки; опционально по статусу.
-     * Для {@code GET /flights} и фильтрации расписания (задача 2).
+     * Все рейсы для списка API (без фильтров). Фильтр по направлению (IATA) делается в сервисе из-за {@code char(3)} в БД.
      */
     @Query("""
-            SELECT f FROM Flight f JOIN f.schedule s
-            WHERE s.scheduledDeparture >= :dayStart
-              AND s.scheduledDeparture < :dayEnd
-              AND (:status IS NULL OR f.status = :status)
+            SELECT DISTINCT f FROM Flight f
+            JOIN FETCH f.schedule s
+            JOIN FETCH s.airline a
+            LEFT JOIN FETCH f.aircraftType
             ORDER BY s.scheduledDeparture
             """)
-    List<Flight> findByScheduleDayAndOptionalStatus(
-            @Param("dayStart") LocalDateTime dayStart,
-            @Param("dayEnd") LocalDateTime dayEnd,
-            @Param("status") FlightStatus status
-    );
+    List<Flight> findAllForApiList();
+
 }

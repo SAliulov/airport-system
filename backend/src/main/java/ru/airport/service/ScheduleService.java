@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
+import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
@@ -14,6 +15,7 @@ import ru.airport.model.FlightStatus;
 import ru.airport.model.Schedule;
 import ru.airport.repository.AirlineRepository;
 import ru.airport.repository.FlightRepository;
+import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.ScheduleRepository;
 
 import java.time.LocalDate;
@@ -34,15 +36,39 @@ public class ScheduleService {
     private final AirlineRepository airlineRepository;
     private final DtoMapper mapper;
 
-    public List<ScheduleRs> list(LocalDate date, Integer airlineId, FlightStatus status, String search) {
+    /**
+     * @param direction IATA аэропорта: вылет или прилёт совпадает с кодом (FirstLab §2, задача 2).
+     */
+    public List<ScheduleRs> list(
+            LocalDate date,
+            Integer airlineId,
+            FlightStatus status,
+            String search,
+            String direction
+    ) {
         List<Schedule> candidates = resolveCandidates(date, status);
         String q = search != null ? search.trim() : "";
+        String dir = normalizeAirport(direction);
         return candidates.stream()
                 .filter(s -> airlineId == null || s.getAirline().getAirlineId().equals(airlineId))
                 .filter(s -> q.isEmpty() || s.getFlightNumber().toLowerCase().contains(q.toLowerCase()))
+                .filter(s -> dir == null || matchesDirection(s, dir))
                 .sorted(Comparator.comparing(Schedule::getScheduledDeparture))
                 .map(mapper::toScheduleRs)
                 .toList();
+    }
+
+    private static String normalizeAirport(String direction) {
+        if (direction == null || direction.isBlank()) {
+            return null;
+        }
+        return direction.trim().toUpperCase();
+    }
+
+    private static boolean matchesDirection(Schedule s, String airportIataUpper) {
+        String o = s.getOriginAirport() != null ? s.getOriginAirport().trim().toUpperCase() : "";
+        String d = s.getDestinationAirport() != null ? s.getDestinationAirport().trim().toUpperCase() : "";
+        return airportIataUpper.equals(o) || airportIataUpper.equals(d);
     }
 
     private List<Schedule> resolveCandidates(LocalDate date, FlightStatus status) {
@@ -50,7 +76,8 @@ public class ScheduleService {
             LocalDateTime start = date.atStartOfDay();
             LocalDateTime end = date.plusDays(1).atStartOfDay();
             if (status != null) {
-                List<Flight> flights = flightRepository.findByScheduleDayAndOptionalStatus(start, end, status);
+                List<Flight> flights = flightRepository.findAll(
+                        FlightSpecifications.forApiList(start, end, status, null));
                 return distinctSchedules(flights.stream().map(Flight::getSchedule).toList());
             }
             return scheduleRepository.findByDay(start, end);
@@ -96,7 +123,11 @@ public class ScheduleService {
 
     @Transactional
     public void delete(Integer id) {
-        scheduleRepository.delete(loadSchedule(id));
+        loadSchedule(id);
+        if (flightRepository.existsBySchedule_ScheduleId(id)) {
+            throw new ConflictException("Нельзя удалить расписание: есть связанные рейсы.");
+        }
+        scheduleRepository.deleteById(id);
     }
 
     private Schedule loadSchedule(Integer id) {

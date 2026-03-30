@@ -13,6 +13,7 @@ import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
 import ru.airport.repository.AirlineRepository;
+import ru.airport.repository.ScheduleRepository;
 
 import java.util.List;
 
@@ -24,6 +25,7 @@ public class AirlineService {
     public static final String CACHE_AIRLINES = "airlines";
 
     private final AirlineRepository airlineRepository;
+    private final ScheduleRepository scheduleRepository;
     private final DtoMapper mapper;
 
     @Cacheable(cacheNames = CACHE_AIRLINES, key = "'all'")
@@ -63,7 +65,11 @@ public class AirlineService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public void delete(Integer id) {
-        airlineRepository.delete(loadAirline(id));
+        loadAirline(id);
+        if (scheduleRepository.existsByAirline_AirlineId(id)) {
+            throw new ConflictException("Нельзя удалить авиакомпанию: есть связанные расписания.");
+        }
+        airlineRepository.deleteById(id);
     }
 
     public Airline getReferenceById(Integer id) {

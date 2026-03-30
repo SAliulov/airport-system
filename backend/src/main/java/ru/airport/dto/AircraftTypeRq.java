@@ -2,6 +2,7 @@ package ru.airport.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -23,7 +24,8 @@ import ru.airport.model.SizeCategory;
 public class AircraftTypeRq {
 
     @NotBlank
-    @Size(max = 4)
+    @Size(min = 2, max = 4)
+    @Pattern(regexp = "[A-Za-z0-9]{2,4}", message = "ICAO-код типа ВС: 2–4 латинских буквы или цифры")
     private String icaoCode;
 
     @PositiveOrZero

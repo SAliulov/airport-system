@@ -18,6 +18,7 @@ import ru.airport.model.Schedule;
 import ru.airport.model.SizeCategory;
 import ru.airport.testsupport.DockerConditions;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,6 +100,45 @@ class AirportJpaRepositoriesIT {
 
         LocalDateTime afterArrival = LocalDateTime.of(2026, 3, 29, 11, 30);
         assertThat(flightRepository.findReadyToArrive(afterArrival))
+                .extracting(Flight::getFlightId)
+                .contains(flight.getFlightId());
+    }
+
+    @Test
+    void forApiList_specification_filtersByDayStatusAndAirline_withoutJpqlNullOrBug() {
+        Airline su = airlineRepository.findByIataCode("SU").orElseThrow();
+        LocalDate day = LocalDate.of(2026, 7, 15);
+        LocalDateTime dep = day.atTime(8, 0);
+        LocalDateTime arr = day.atTime(10, 0);
+        Schedule schedule = scheduleRepository.save(Schedule.builder()
+                .flightNumber("SU700")
+                .originAirport("SVO")
+                .destinationAirport("LED")
+                .scheduledDeparture(dep)
+                .scheduledArrival(arr)
+                .airline(su)
+                .build());
+        Flight flight = flightRepository.save(Flight.builder()
+                .schedule(schedule)
+                .status(FlightStatus.SCHEDULED)
+                .build());
+
+        LocalDateTime start = day.atStartOfDay();
+        LocalDateTime end = day.plusDays(1).atStartOfDay();
+
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.SCHEDULED, null)))
+                .extracting(Flight::getFlightId)
+                .contains(flight.getFlightId());
+
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.ARRIVED, null)))
+                .extracting(Flight::getFlightId)
+                .doesNotContain(flight.getFlightId());
+
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, null, su.getAirlineId())))
+                .extracting(Flight::getFlightId)
+                .contains(flight.getFlightId());
+
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(null, null, FlightStatus.SCHEDULED, null)))
                 .extracting(Flight::getFlightId)
                 .contains(flight.getFlightId());
     }

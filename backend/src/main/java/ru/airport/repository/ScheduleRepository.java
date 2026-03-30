@@ -13,6 +13,8 @@ import java.util.List;
  */
 public interface ScheduleRepository extends JpaRepository<Schedule, Integer> {
 
+    boolean existsByAirline_AirlineId(Integer airlineId);
+
     List<Schedule> findByAirline_AirlineId(Integer airlineId);
 
     List<Schedule> findByFlightNumberContainingIgnoreCase(String flightNumber);

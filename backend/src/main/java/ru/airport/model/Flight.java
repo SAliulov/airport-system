@@ -2,6 +2,7 @@ package ru.airport.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -90,6 +91,7 @@ public class Flight {
     @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY,
             cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE })
     @OrderBy("assignmentId ASC")
+    @BatchSize(size = 32)
     @Builder.Default
     private List<GateAssignment> gateAssignments = new ArrayList<>();
 
@@ -100,6 +102,7 @@ public class Flight {
     @OneToMany(mappedBy = "flight", fetch = FetchType.LAZY,
             cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE })
     @OrderBy("createdAt ASC")
+    @BatchSize(size = 32)
     @Builder.Default
     private List<DelayWarning> delayWarnings = new ArrayList<>();
 

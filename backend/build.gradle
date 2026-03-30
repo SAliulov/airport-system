@@ -15,6 +15,11 @@ java {
     sourceCompatibility = JavaVersion.VERSION_21
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.add('-parameters')
+}
+
 repositories {
     mavenCentral()
 }
@@ -37,6 +42,9 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
+
+    // OpenAPI / Swagger UI (2.5.x совместим с Spring Boot 3.3; 2.7.x требует Boot 3.4+ / LiteWebJarsResourceResolver)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
     // Экспорт PDF и Excel
     implementation 'org.apache.poi:poi-ooxml:5.2.5'

@@ -1,8 +1,4 @@
 spring:
-  security:
-    user:
-      name: dispatcher
-      password: dispatcher123
   datasource:
     url: jdbc:postgresql://localhost:5432/airport
     username: airport_user
@@ -29,6 +25,17 @@ spring:
 server:
   port: 8080
 
+# Swagger UI: http://localhost:8080/swagger-ui.html  (OpenAPI JSON: /v3/api-docs)
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: alpha
+
 jwt:
   secret: airport-secret-key-change-in-production-must-be-long
   expiration: 86400000          # 24 часа в миллисекундах
+
+# Интервал автообновления статусов рейсов (мс), задача 3 FirstLab
+airport:
+  scheduler:
+    flight-status-ms: 60000
