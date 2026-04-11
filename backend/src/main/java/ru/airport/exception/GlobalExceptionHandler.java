@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -45,6 +46,16 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", detail));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> responseStatus(ResponseStatusException ex) {
+        String reason = ex.getReason();
+        if (reason == null || reason.isBlank()) {
+            reason = ex.getStatusCode().toString();
+        }
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(Map.of("error", reason));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

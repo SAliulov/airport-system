@@ -38,14 +38,16 @@ public class ScheduleService {
 
     /**
      * @param direction IATA аэропорта: вылет или прилёт совпадает с кодом (FirstLab §2, задача 2).
+     * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
      */
     public List<ScheduleRs> list(
             LocalDate date,
             Integer airlineId,
-            FlightStatus status,
+            String statusRaw,
             String search,
             String direction
     ) {
+        FlightStatus status = FlightStatusParser.parseOptional(statusRaw);
         List<Schedule> candidates = resolveCandidates(date, status);
         String q = search != null ? search.trim() : "";
         String dir = normalizeAirport(direction);

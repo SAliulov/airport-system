@@ -1,5 +1,8 @@
 package ru.airport.service;
 
+import com.itextpdf.io.font.PdfEncodings;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
@@ -13,29 +16,47 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.GateAssignmentRs;
 import ru.airport.dto.ScheduleRs;
+import ru.airport.mapper.DtoMapper;
+import ru.airport.model.Flight;
+import ru.airport.repository.FlightRepository;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Экспорт итогового расписания на день (задача 6, FirstLab).
+ * Строки совпадают с {@code GET /api/v1/schedules?date=} (тот же {@link ScheduleService#list});
+ * колонки «Status» и «Gate» подставляются из связанного {@code flight} за этот день, если запись есть;
+ * иначе «—» (план есть, выполняемый рейс ещё не создан).
+ * PDF: кириллица через {@code /fonts/NotoSans-Regular.ttf}; без файла — подстановка «?» для не-ASCII.
+ * Требуется HTTP Basic (роль DISPATCHER); без заголовка Authorization — 401, не 500.
  */
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ScheduleExportService {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final String PDF_FONT_RESOURCE = "/fonts/NotoSans-Regular.ttf";
 
-    private final FlightService flightService;
+    private final ScheduleService scheduleService;
+    private final FlightRepository flightRepository;
+    private final DtoMapper mapper;
 
     public byte[] exportExcel(LocalDate date) throws IOException {
-        List<FlightRs> rows = flightService.list(date, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.list(date, null, null, null, null);
+        Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sh = wb.createSheet("Flights");
             Row h = sh.createRow(0);
@@ -46,9 +67,9 @@ public class ScheduleExportService {
                 h.createCell(i).setCellValue(headers[i]);
             }
             int r = 1;
-            for (FlightRs f : rows) {
+            for (ScheduleRs s : schedules) {
                 Row row = sh.createRow(r++);
-                fillRow(row, f);
+                fillRow(row, s, flightByScheduleId.get(s.getScheduleId()));
             }
             for (int i = 0; i < headers.length; i++) {
                 sh.autoSizeColumn(i);
@@ -59,50 +80,105 @@ public class ScheduleExportService {
     }
 
     public byte[] exportPdf(LocalDate date) {
-        List<FlightRs> rows = flightService.list(date, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.list(date, null, null, null, null);
+        Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
+        PdfFont font = loadPdfBodyFont();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
         Document doc = new Document(pdf);
-        doc.add(new Paragraph("Airport schedule - " + date).setBold().setTextAlignment(TextAlignment.CENTER));
+        doc.add(pdfParagraph("Airport schedule - " + date, font, true).setTextAlignment(TextAlignment.CENTER));
         doc.add(new Paragraph(" "));
 
         float[] cols = {1.2f, 1f, 0.8f, 0.8f, 1.4f, 1.4f, 1.1f, 0.9f};
         Table table = new Table(UnitValue.createPercentArray(cols)).useAllAvailableWidth();
         String[] headers = {"Flight", "Airline", "From", "To", "Departure", "Arrival", "Status", "Gate"};
         for (String h : headers) {
-            table.addHeaderCell(headerCell(h));
+            table.addHeaderCell(headerCell(h, font));
         }
-        for (FlightRs f : rows) {
-            ScheduleRs s = f.getSchedule();
-            table.addCell(pdfCell(s != null ? s.getFlightNumber() : ""));
-            table.addCell(pdfCell(s != null && s.getAirline() != null ? s.getAirline().getIataCode() : ""));
-            table.addCell(pdfCell(s != null ? s.getOriginAirport() : ""));
-            table.addCell(pdfCell(s != null ? s.getDestinationAirport() : ""));
-            table.addCell(pdfCell(s != null && s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : ""));
-            table.addCell(pdfCell(s != null && s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : ""));
-            table.addCell(pdfCell(f.getStatus() != null ? f.getStatus().name() : ""));
-            GateAssignmentRs ga = f.getCurrentGateAssignment();
+        for (ScheduleRs s : schedules) {
+            FlightRs f = flightByScheduleId.get(s.getScheduleId());
+            table.addCell(pdfCell(s.getFlightNumber(), font));
+            table.addCell(pdfCell(s.getAirline() != null ? s.getAirline().getIataCode() : "", font));
+            table.addCell(pdfCell(s.getOriginAirport(), font));
+            table.addCell(pdfCell(s.getDestinationAirport(), font));
+            table.addCell(pdfCell(s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : "", font));
+            table.addCell(pdfCell(s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : "", font));
+            table.addCell(pdfCell(f != null && f.getStatus() != null ? f.getStatus().name() : "—", font));
             String gate = "";
-            if (ga != null && ga.getGate() != null) {
-                gate = ga.getGate().getGateNumber();
+            if (f != null && f.getCurrentGateAssignment() != null && f.getCurrentGateAssignment().getGate() != null) {
+                gate = f.getCurrentGateAssignment().getGate().getGateNumber();
             }
-            table.addCell(pdfCell(gate));
+            table.addCell(pdfCell(gate, font));
         }
         doc.add(table);
         doc.close();
         return baos.toByteArray();
     }
 
-    private static Cell headerCell(String text) {
+    /**
+     * Один рейс на расписание за сутки; при нескольких {@code flight} на одно {@code schedule}
+     * оставляем «богаче» данными (есть актуальный гейт, иначе больший {@code flightId}).
+     */
+    private Map<Integer, FlightRs> indexFlightsForDay(LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        Map<Integer, Flight> chosen = new LinkedHashMap<>();
+        for (Flight fl : flightRepository.findByDay(start, end)) {
+            Integer sid = fl.getSchedule().getScheduleId();
+            chosen.merge(sid, fl, ScheduleExportService::preferRicherFlight);
+        }
+        Map<Integer, FlightRs> map = new LinkedHashMap<>();
+        chosen.forEach((k, v) -> map.put(k, mapper.toFlightRsSummary(v)));
+        return map;
+    }
+
+    private static Flight preferRicherFlight(Flight existing, Flight incoming) {
+        boolean eGate = existing.getActiveGateAssignment() != null;
+        boolean iGate = incoming.getActiveGateAssignment() != null;
+        if (eGate != iGate) {
+            return iGate ? incoming : existing;
+        }
+        int eid = existing.getFlightId() != null ? existing.getFlightId() : 0;
+        int iid = incoming.getFlightId() != null ? incoming.getFlightId() : 0;
+        return iid >= eid ? incoming : existing;
+    }
+
+    private PdfFont loadPdfBodyFont() {
+        try (InputStream is = ScheduleExportService.class.getResourceAsStream(PDF_FONT_RESOURCE)) {
+            if (is == null) {
+                return null;
+            }
+            byte[] bytes = is.readAllBytes();
+            return PdfFontFactory.createFont(
+                    bytes,
+                    PdfEncodings.IDENTITY_H,
+                    PdfFontFactory.EmbeddingStrategy.FORCE_EMBEDDED);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Paragraph pdfParagraph(String text, PdfFont font, boolean bold) {
+        String t = text != null ? text : "";
+        Paragraph p = new Paragraph(font != null ? t : asciiPdfSafe(t));
+        if (font != null) {
+            p.setFont(font);
+        }
+        if (bold) {
+            p.setBold();
+        }
+        return p;
+    }
+
+    private static Cell headerCell(String text, PdfFont font) {
         return new Cell()
-                .add(new Paragraph(asciiPdfSafe(text)).setBold())
+                .add(pdfParagraph(text, font, true))
                 .setTextAlignment(TextAlignment.CENTER);
     }
 
     /**
-     * Стандартный шрифт PDF без встроенного TTF не рисует кириллицу и может бросить исключение.
-     * Excel оставляем с полным UTF-16; для PDF — только печатный ASCII, остальное «?».
+     * Если TTF не загрузился, стандартный шрифт PDF не рисует кириллицу — оставляем печатный ASCII.
      */
     private static String asciiPdfSafe(String text) {
         if (text == null || text.isEmpty()) {
@@ -116,24 +192,27 @@ public class ScheduleExportService {
         return sb.toString();
     }
 
-    private static Cell pdfCell(String text) {
-        return new Cell().add(new Paragraph(asciiPdfSafe(text)));
+    private static Cell pdfCell(String text, PdfFont font) {
+        String t = text != null ? text : "";
+        return new Cell().add(pdfParagraph(t, font, false));
     }
 
-    private static void fillRow(Row row, FlightRs f) {
-        ScheduleRs s = f.getSchedule();
+    private static void fillRow(Row row, ScheduleRs s, FlightRs flightRow) {
         int c = 0;
-        row.createCell(c++).setCellValue(s != null ? s.getFlightNumber() : "");
-        row.createCell(c++).setCellValue(s != null && s.getAirline() != null ? s.getAirline().getIataCode() : "");
-        row.createCell(c++).setCellValue(s != null ? s.getOriginAirport() : "");
-        row.createCell(c++).setCellValue(s != null ? s.getDestinationAirport() : "");
-        row.createCell(c++).setCellValue(s != null && s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : "");
-        row.createCell(c++).setCellValue(s != null && s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : "");
-        row.createCell(c++).setCellValue(f.getStatus() != null ? f.getStatus().name() : "");
-        GateAssignmentRs ga = f.getCurrentGateAssignment();
+        row.createCell(c++).setCellValue(s.getFlightNumber() != null ? s.getFlightNumber() : "");
+        row.createCell(c++).setCellValue(s.getAirline() != null ? s.getAirline().getIataCode() : "");
+        row.createCell(c++).setCellValue(s.getOriginAirport() != null ? s.getOriginAirport() : "");
+        row.createCell(c++).setCellValue(s.getDestinationAirport() != null ? s.getDestinationAirport() : "");
+        row.createCell(c++).setCellValue(s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : "");
+        row.createCell(c++).setCellValue(s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : "");
+        row.createCell(c++).setCellValue(
+                flightRow != null && flightRow.getStatus() != null ? flightRow.getStatus().name() : "—");
         String gate = "";
-        if (ga != null && ga.getGate() != null) {
-            gate = ga.getGate().getGateNumber();
+        if (flightRow != null) {
+            GateAssignmentRs ga = flightRow.getCurrentGateAssignment();
+            if (ga != null && ga.getGate() != null) {
+                gate = ga.getGate().getGateNumber();
+            }
         }
         row.createCell(c).setCellValue(gate);
     }

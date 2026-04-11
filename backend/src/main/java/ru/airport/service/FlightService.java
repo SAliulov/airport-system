@@ -53,8 +53,11 @@ public class FlightService {
 
     /**
      * Список рейсов с опциональными фильтрами (табло FirstLab §2: дата, статус, авиакомпания, направление IATA).
+     *
+     * @param statusRaw значение query {@code status} (имя enum), парсится здесь — контроллер не зависит от {@link FlightStatus}.
      */
-    public List<FlightRs> list(LocalDate date, FlightStatus status, Integer airlineId, String direction) {
+    public List<FlightRs> list(LocalDate date, String statusRaw, Integer airlineId, String direction) {
+        FlightStatus status = FlightStatusParser.parseOptional(statusRaw);
         LocalDateTime dayStart = date != null ? date.atStartOfDay() : null;
         LocalDateTime dayEnd = date != null ? date.plusDays(1).atStartOfDay() : null;
         String dir = normalizeAirport(direction);
@@ -193,6 +196,17 @@ public class FlightService {
         DelayWarningRs rs = mapper.toDelayWarningRs(delayWarningRepository.save(entity));
         realtimeNotificationService.publishDelayWarning(flightId, rs);
         return rs;
+    }
+
+    /**
+     * Удаление экземпляра рейса (задача 2: CRUD для {@code flight}). Дочерние {@code gate_assignment}
+     * и {@code delay_warning} удаляются каскадом (см. {@link Flight}, DbScheme / Flyway).
+     */
+    @Transactional
+    public void delete(Integer id) {
+        Flight flight = loadFlight(id);
+        touchCollections(flight);
+        flightRepository.delete(flight);
     }
 
     private Flight loadFlight(Integer id) {

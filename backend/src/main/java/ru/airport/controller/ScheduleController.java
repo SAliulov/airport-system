@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
-import ru.airport.model.FlightStatus;
 import ru.airport.service.ScheduleExportService;
 import ru.airport.service.ScheduleService;
 
@@ -66,8 +65,10 @@ public class ScheduleController {
             @Parameter(
                     name = "status",
                     description = "Фильтр по статусу выполняемых рейсов (flight) в календарный день `date`; не поле шаблона расписания. В `ScheduleRs` статус рейса не возвращается — смотрите сущность flight / список рейсов.",
-                    schema = @Schema(implementation = FlightStatus.class))
-            @RequestParam(name = "status", required = false) FlightStatus status,
+                    schema = @Schema(
+                            type = "string",
+                            allowableValues = {"SCHEDULED", "DEPARTED", "ARRIVED", "DELAYED", "CANCELLED"}))
+            @RequestParam(name = "status", required = false) String status,
             @Parameter(name = "search", description = "Подстрока в номере рейса (без учёта регистра).")
             @RequestParam(name = "search", required = false) String search,
             @Parameter(

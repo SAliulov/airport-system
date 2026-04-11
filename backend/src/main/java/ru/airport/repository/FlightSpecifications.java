@@ -32,7 +32,10 @@ public final class FlightSpecifications {
             FlightStatus status,
             Integer airlineId) {
         return (root, query, cb) -> {
-            root.fetch("aircraftType", JoinType.LEFT);
+            // Только join (без fetch): fetch в Specification + DISTINCT даёт на PostgreSQL
+            // ошибку вида «ORDER BY выражения должны входить в SELECT при DISTINCT» и 500 на API.
+            // Связи schedule/airline подгружаются через join; aircraftType — лениво в той же транзакции.
+            root.join("aircraftType", JoinType.LEFT);
             Join<Flight, Schedule> scheduleJoin = root.join("schedule", JoinType.INNER);
             Join<Schedule, Airline> airlineJoin = scheduleJoin.join("airline", JoinType.INNER);
 
@@ -51,7 +54,7 @@ public final class FlightSpecifications {
             }
 
             query.orderBy(cb.asc(scheduleJoin.get("scheduledDeparture")));
-            query.distinct(true);
+            // DISTINCT не используем: при inner join schedule+airline дубликатов Flight не будет.
 
             return predicates.isEmpty()
                     ? cb.conjunction()

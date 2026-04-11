@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +28,6 @@ import ru.airport.dto.FlightRs;
 import ru.airport.dto.FlightStatusUpdateRq;
 import ru.airport.dto.GateAssignmentRq;
 import ru.airport.dto.GateAssignmentRs;
-import ru.airport.model.FlightStatus;
 import ru.airport.service.FlightService;
 
 import java.time.LocalDate;
@@ -60,9 +60,11 @@ public class FlightController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(
                     name = "status",
-                    description = "Статус выполняемого рейса (flight).",
-                    schema = @Schema(implementation = FlightStatus.class))
-            @RequestParam(name = "status", required = false) FlightStatus status,
+                    description = "Статус выполняемого рейса (flight), строка как у enum.",
+                    schema = @Schema(
+                            type = "string",
+                            allowableValues = {"SCHEDULED", "DEPARTED", "ARRIVED", "DELAYED", "CANCELLED"}))
+            @RequestParam(name = "status", required = false) String status,
             @Parameter(
                     name = "airline",
                     description = "Идентификатор авиакомпании в БД (`airline_id`), см. GET /api/v1/airlines.")
@@ -84,6 +86,12 @@ public class FlightController {
     @ResponseStatus(HttpStatus.CREATED)
     public FlightRs create(@RequestBody @Valid FlightRq rq) {
         return flightService.create(rq);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") Integer id) {
+        flightService.delete(id);
     }
 
     @PutMapping("/{id}/status")
