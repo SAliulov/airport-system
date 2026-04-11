@@ -46,3 +46,6 @@ node_modules/
 *.env
 application-prod.yml
 AGENTS.md
+
+# Examples
+Лекция 8/
