@@ -13,6 +13,7 @@ import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.AircraftType;
 import ru.airport.repository.AircraftTypeRepository;
+import ru.airport.validation.TextNormalization;
 
 import java.util.List;
 
@@ -41,6 +42,7 @@ public class AircraftTypeService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRCRAFT_TYPES, allEntries = true)
     public AircraftTypeRs create(AircraftTypeRq rq) {
+        TextNormalization.normalizeAircraftTypeCodes(rq);
         aircraftTypeBusinessRules.assertIcaoUniqueForCreate(
                 aircraftTypeRepository.existsByIcaoCode(rq.getIcaoCode()), rq.getIcaoCode());
         AircraftType saved = aircraftTypeRepository.save(mapper.newAircraftType(rq));
@@ -50,6 +52,7 @@ public class AircraftTypeService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRCRAFT_TYPES, allEntries = true)
     public AircraftTypeRs update(Integer id, AircraftTypeRq rq) {
+        TextNormalization.normalizeAircraftTypeCodes(rq);
         AircraftType t = loadType(id);
         Integer otherId = aircraftTypeRepository.findByIcaoCode(rq.getIcaoCode())
                 .map(AircraftType::getAircraftTypeId)

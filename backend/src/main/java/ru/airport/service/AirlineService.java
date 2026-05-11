@@ -14,6 +14,7 @@ import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
 import ru.airport.repository.AirlineRepository;
 import ru.airport.repository.ScheduleRepository;
+import ru.airport.validation.TextNormalization;
 
 import java.util.List;
 
@@ -43,6 +44,7 @@ public class AirlineService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public AirlineRs create(AirlineRq rq) {
+        TextNormalization.normalizeAirlineCodes(rq);
         airlineBusinessRules.assertIataUniqueForCreate(
                 airlineRepository.existsByIataCode(rq.getIataCode()), rq.getIataCode());
         Airline saved = airlineRepository.save(mapper.newAirline(rq));
@@ -52,6 +54,7 @@ public class AirlineService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public AirlineRs update(Integer id, AirlineRq rq) {
+        TextNormalization.normalizeAirlineCodes(rq);
         Airline a = loadAirline(id);
         Integer otherId = airlineRepository.findByIataCode(rq.getIataCode())
                 .map(Airline::getAirlineId)

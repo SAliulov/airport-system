@@ -36,7 +36,7 @@ import java.util.Map;
 
 /**
  * Экспорт итогового расписания на день (задача 6, FirstLab).
- * Строки совпадают с {@code GET /api/v1/schedules?date=} (тот же {@link ScheduleService#list});
+ * Строки совпадают с {@code GET /api/v1/schedules/filter?date=} (тот же набор, что {@link ScheduleService#filter});
  * колонки «Status» и «Gate» подставляются из связанного {@code flight} за этот день, если запись есть;
  * иначе «—» (план есть, выполняемый рейс ещё не создан).
  * PDF: кириллица через {@code /fonts/NotoSans-Regular.ttf}; без файла — подстановка «?» для не-ASCII.

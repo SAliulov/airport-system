@@ -13,6 +13,7 @@ import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Gate;
 import ru.airport.repository.GateAssignmentRepository;
 import ru.airport.repository.GateRepository;
+import ru.airport.validation.TextNormalization;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,6 +47,7 @@ public class GateService {
 
     @Transactional
     public GateRs create(GateRq rq) {
+        TextNormalization.normalizeGateRequest(rq);
         gateBusinessRules.assertGateNumberUniqueForCreate(
                 gateRepository.existsByGateNumber(rq.getGateNumber()), rq.getGateNumber());
         Gate saved = gateRepository.save(mapper.newGate(rq));
@@ -54,6 +56,7 @@ public class GateService {
 
     @Transactional
     public GateRs update(Integer id, GateRq rq) {
+        TextNormalization.normalizeGateRequest(rq);
         Gate g = loadGate(id);
         Integer otherId = gateRepository.findByGateNumber(rq.getGateNumber())
                 .map(Gate::getGateId)

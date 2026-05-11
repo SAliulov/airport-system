@@ -22,7 +22,7 @@ public class AirlineRq {
 
     @NotBlank
     @Size(min = 2, max = 2)
-    @Pattern(regexp = "[A-Za-z0-9]{2}", message = "IATA-код авиакомпании: ровно 2 латинских буквы или цифры")
+    @Pattern(regexp = "[A-Za-z0-9]{2}", message = "IATA-код авиакомпании: ровно 2 латинские буквы или цифры")
     private String iataCode;
 
     @NotBlank

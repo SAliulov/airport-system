@@ -18,6 +18,7 @@ import ru.airport.repository.FlightRepository;
 import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.ScheduleRepository;
 import ru.airport.validation.FlightStatusParser;
+import ru.airport.validation.TextNormalization;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -134,6 +135,7 @@ public class ScheduleService {
 
     @Transactional
     public ScheduleRs create(ScheduleRq rq) {
+        TextNormalization.normalizeScheduleAirports(rq);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
         Schedule saved = scheduleRepository.save(mapper.newSchedule(rq, airline));
@@ -142,6 +144,7 @@ public class ScheduleService {
 
     @Transactional
     public ScheduleRs update(Integer id, ScheduleRq rq) {
+        TextNormalization.normalizeScheduleAirports(rq);
         Schedule s = loadSchedule(id);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));

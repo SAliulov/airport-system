@@ -1,6 +1,7 @@
 package ru.airport.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 public class GateAssignmentRq {
 
     @NotNull
+    @Positive
     private Integer gateId;
 
     @NotNull
