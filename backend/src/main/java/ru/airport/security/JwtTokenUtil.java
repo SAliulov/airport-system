@@ -13,6 +13,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Optional;
 
@@ -50,6 +51,22 @@ public class JwtTokenUtil {
 
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    /**
+     * Момент истечения токена (exp). Невалидный JWT или отсутствующий exp → now + {@code jwt.expiration},
+     * чтобы запись blacklist не жила бесконечно.
+     */
+    public Instant extractExpiration(String token) {
+        try {
+            Date exp = parseClaims(token).getExpiration();
+            if (exp != null) {
+                return exp.toInstant();
+            }
+        } catch (RuntimeException ignored) {
+            // неверная подпись / формат
+        }
+        return Instant.now().plusMillis(jwtProperties.getExpiration());
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
