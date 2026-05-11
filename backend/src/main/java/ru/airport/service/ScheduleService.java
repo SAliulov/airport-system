@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.airport.business.ScheduleBusinessRules;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
-import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
@@ -17,6 +17,7 @@ import ru.airport.repository.AirlineRepository;
 import ru.airport.repository.FlightRepository;
 import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.ScheduleRepository;
+import ru.airport.validation.FlightStatusParser;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,12 +36,37 @@ public class ScheduleService {
     private final FlightRepository flightRepository;
     private final AirlineRepository airlineRepository;
     private final DtoMapper mapper;
+    private final ScheduleBusinessRules scheduleBusinessRules;
 
     /**
-     * @param direction IATA аэропорта: вылет или прилёт совпадает с кодом (FirstLab §2, задача 2).
+     * Все расписания без фильтров (GET /schedules).
+     */
+    public List<ScheduleRs> listAll() {
+        return scheduleRepository.findAll(Sort.by(Sort.Order.asc("scheduledDeparture"))).stream()
+                .map(mapper::toScheduleRs)
+                .toList();
+    }
+
+    /**
+     * Фильтрация по дате, авиакомпании, статусу рейса, направлению (GET /schedules/filter).
+     *
      * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
      */
-    public List<ScheduleRs> list(
+    public List<ScheduleRs> filter(LocalDate date, Integer airlineId, String statusRaw, String direction) {
+        return findSchedules(date, airlineId, statusRaw, null, direction);
+    }
+
+    /**
+     * Поиск по подстроке номера рейса с опциональными фильтрами (GET /schedules/search).
+     *
+     * @param query     подстрока для поиска в номере рейса (обязательно)
+     * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
+     */
+    public List<ScheduleRs> search(String query, LocalDate date, Integer airlineId, String statusRaw, String direction) {
+        return findSchedules(date, airlineId, statusRaw, query, direction);
+    }
+
+    private List<ScheduleRs> findSchedules(
             LocalDate date,
             Integer airlineId,
             String statusRaw,
@@ -79,7 +105,7 @@ public class ScheduleService {
             LocalDateTime end = date.plusDays(1).atStartOfDay();
             if (status != null) {
                 List<Flight> flights = flightRepository.findAll(
-                        FlightSpecifications.forApiList(start, end, status, null));
+                        FlightSpecifications.forApiList(start, end, status, null, null));
                 return distinctSchedules(flights.stream().map(Flight::getSchedule).toList());
             }
             return scheduleRepository.findByDay(start, end);
@@ -126,9 +152,7 @@ public class ScheduleService {
     @Transactional
     public void delete(Integer id) {
         loadSchedule(id);
-        if (flightRepository.existsBySchedule_ScheduleId(id)) {
-            throw new ConflictException("Нельзя удалить расписание: есть связанные рейсы.");
-        }
+        scheduleBusinessRules.assertMayDelete(flightRepository.existsBySchedule_ScheduleId(id));
         scheduleRepository.deleteById(id);
     }
 

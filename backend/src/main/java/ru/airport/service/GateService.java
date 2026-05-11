@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.airport.business.GateBusinessRules;
 import ru.airport.dto.GateRq;
 import ru.airport.dto.GateRs;
 import ru.airport.dto.GateTimelineSegmentRs;
-import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Gate;
@@ -26,6 +26,7 @@ public class GateService {
     private final GateRepository gateRepository;
     private final GateAssignmentRepository gateAssignmentRepository;
     private final DtoMapper mapper;
+    private final GateBusinessRules gateBusinessRules;
 
     public List<GateRs> findAll() {
         return gateRepository.findAll(Sort.by("gateNumber")).stream()
@@ -45,9 +46,8 @@ public class GateService {
 
     @Transactional
     public GateRs create(GateRq rq) {
-        if (gateRepository.existsByGateNumber(rq.getGateNumber())) {
-            throw new ConflictException("Номер гейта уже занят: " + rq.getGateNumber());
-        }
+        gateBusinessRules.assertGateNumberUniqueForCreate(
+                gateRepository.existsByGateNumber(rq.getGateNumber()), rq.getGateNumber());
         Gate saved = gateRepository.save(mapper.newGate(rq));
         return mapper.toGateRs(saved);
     }
@@ -55,13 +55,19 @@ public class GateService {
     @Transactional
     public GateRs update(Integer id, GateRq rq) {
         Gate g = loadGate(id);
-        gateRepository.findByGateNumber(rq.getGateNumber()).ifPresent(other -> {
-            if (!other.getGateId().equals(id)) {
-                throw new ConflictException("Номер гейта уже занят: " + rq.getGateNumber());
-            }
-        });
+        Integer otherId = gateRepository.findByGateNumber(rq.getGateNumber())
+                .map(Gate::getGateId)
+                .orElse(null);
+        gateBusinessRules.assertGateNumberUniqueForUpdate(id, rq.getGateNumber(), otherId);
         mapper.apply(rq, g);
         return mapper.toGateRs(gateRepository.save(g));
+    }
+
+    @Transactional
+    public void delete(Integer id) {
+        Gate gate = loadGate(id);
+        gateBusinessRules.assertMayDelete(gateAssignmentRepository.existsByGate_GateId(id));
+        gateRepository.delete(gate);
     }
 
     /**

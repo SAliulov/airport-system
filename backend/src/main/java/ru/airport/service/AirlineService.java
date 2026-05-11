@@ -6,9 +6,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.airport.business.AirlineBusinessRules;
 import ru.airport.dto.AirlineRq;
 import ru.airport.dto.AirlineRs;
-import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
@@ -27,6 +27,7 @@ public class AirlineService {
     private final AirlineRepository airlineRepository;
     private final ScheduleRepository scheduleRepository;
     private final DtoMapper mapper;
+    private final AirlineBusinessRules airlineBusinessRules;
 
     @Cacheable(cacheNames = CACHE_AIRLINES, key = "'all'")
     public List<AirlineRs> findAll() {
@@ -42,9 +43,8 @@ public class AirlineService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public AirlineRs create(AirlineRq rq) {
-        if (airlineRepository.existsByIataCode(rq.getIataCode())) {
-            throw new ConflictException("IATA-код уже занят: " + rq.getIataCode());
-        }
+        airlineBusinessRules.assertIataUniqueForCreate(
+                airlineRepository.existsByIataCode(rq.getIataCode()), rq.getIataCode());
         Airline saved = airlineRepository.save(mapper.newAirline(rq));
         return mapper.toAirlineRs(saved);
     }
@@ -53,11 +53,10 @@ public class AirlineService {
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public AirlineRs update(Integer id, AirlineRq rq) {
         Airline a = loadAirline(id);
-        airlineRepository.findByIataCode(rq.getIataCode()).ifPresent(other -> {
-            if (!other.getAirlineId().equals(id)) {
-                throw new ConflictException("IATA-код уже занят: " + rq.getIataCode());
-            }
-        });
+        Integer otherId = airlineRepository.findByIataCode(rq.getIataCode())
+                .map(Airline::getAirlineId)
+                .orElse(null);
+        airlineBusinessRules.assertIataUniqueForUpdate(id, rq.getIataCode(), otherId);
         mapper.apply(rq, a);
         return mapper.toAirlineRs(airlineRepository.save(a));
     }
@@ -66,9 +65,7 @@ public class AirlineService {
     @CacheEvict(cacheNames = CACHE_AIRLINES, allEntries = true)
     public void delete(Integer id) {
         loadAirline(id);
-        if (scheduleRepository.existsByAirline_AirlineId(id)) {
-            throw new ConflictException("Нельзя удалить авиакомпанию: есть связанные расписания.");
-        }
+        airlineBusinessRules.assertMayDelete(scheduleRepository.existsByAirline_AirlineId(id));
         airlineRepository.deleteById(id);
     }
 

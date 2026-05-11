@@ -26,4 +26,16 @@ public class FlightStatusBusinessRules {
             throw new ConflictException("Недопустимая смена статуса рейса: " + from + " → " + to);
         }
     }
+
+    public void assertAutoDeparture(FlightStatus from) {
+        if (from != FlightStatus.SCHEDULED && from != FlightStatus.DELAYED) {
+            throw new ConflictException("Автовылет недопустим при статусе " + from);
+        }
+    }
+
+    public void assertAutoArrival(FlightStatus from) {
+        if (from != FlightStatus.DEPARTED) {
+            throw new ConflictException("Автоприлёт недопустим при статусе " + from);
+        }
+    }
 }

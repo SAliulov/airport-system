@@ -15,6 +15,7 @@ import ru.airport.dto.GateSummaryRs;
 import ru.airport.dto.GateTimelineSegmentRs;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
+import ru.airport.dto.UserProfileRs;
 import ru.airport.model.AircraftType;
 import ru.airport.model.Airline;
 import ru.airport.model.DelayWarning;
@@ -22,11 +23,24 @@ import ru.airport.model.Flight;
 import ru.airport.model.Gate;
 import ru.airport.model.GateAssignment;
 import ru.airport.model.Schedule;
+import ru.airport.security.AirportUserPrincipal;
 
 import java.util.List;
 
 @Component
 public class DtoMapper {
+
+    public UserProfileRs toUserProfileRs(AirportUserPrincipal principal) {
+        String role = principal.getAuthorities().stream()
+                .findFirst()
+                .map(a -> a.getAuthority().replace("ROLE_", ""))
+                .orElse("");
+        return UserProfileRs.builder()
+                .userId(principal.getUserId())
+                .username(principal.getUsername())
+                .role(role)
+                .build();
+    }
 
     public AirlineRs toAirlineRs(Airline a) {
         if (a == null) {
@@ -217,6 +231,7 @@ public class DtoMapper {
                 .assignmentId(ga.getAssignmentId())
                 .flightId(fl.getFlightId())
                 .flightNumber(sch.getFlightNumber())
+                .flightStatus(fl.getStatus())
                 .assignedFrom(ga.getAssignedFrom())
                 .assignedTo(ga.getAssignedTo())
                 .build();

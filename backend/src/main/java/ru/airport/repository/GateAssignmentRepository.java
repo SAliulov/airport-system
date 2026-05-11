@@ -20,6 +20,8 @@ public interface GateAssignmentRepository extends JpaRepository<GateAssignment, 
 
     List<GateAssignment> findByGate_GateId(Integer gateId);
 
+    boolean existsByGate_GateId(Integer gateId);
+
     /**
      * Проверка занятости гейта: есть ли пересечение интервалов?
      *
@@ -27,19 +29,18 @@ public interface GateAssignmentRepository extends JpaRepository<GateAssignment, 
      * То есть новый интервал [from, to] пересекается с существующим [assigned_from, assigned_to]
      * если: from < assigned_to AND to > assigned_from
      *
-     * Параметр excludeFlightId нужен при изменении гейта существующего рейса —
-     * чтобы не считать его собственное текущее назначение конфликтом.
+     * Параметр excludeAssignmentId — строка назначения, которую не учитывать (например при правке интервала);
+     * {@code null} — учитываются все строки, в том числе второе пересекающееся назначение того же рейса.
      *
-     * @param gateId          id гейта, который хотим назначить
-     * @param from            начало нового интервала
-     * @param to              конец нового интервала
-     * @param excludeFlightId id рейса, назначение которого игнорируем (0 если нового рейса)
-     * @return список конфликтующих назначений (пустой = гейт свободен)
+     * @param gateId               id гейта
+     * @param from                 начало нового интервала
+     * @param to                   конец нового интервала
+     * @param excludeAssignmentId  id записи gate_assignment, исключаемой из проверки, или {@code null}
      */
     @Query("""
             SELECT ga FROM GateAssignment ga
             WHERE ga.gate.gateId = :gateId
-              AND ga.flight.flightId <> :excludeFlightId
+              AND (:excludeAssignmentId IS NULL OR ga.assignmentId <> :excludeAssignmentId)
               AND ga.assignedFrom < :to
               AND ga.assignedTo > :from
             """)
@@ -47,7 +48,7 @@ public interface GateAssignmentRepository extends JpaRepository<GateAssignment, 
             @Param("gateId") Integer gateId,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
-            @Param("excludeFlightId") Integer excludeFlightId
+            @Param("excludeAssignmentId") Integer excludeAssignmentId
     );
 
     /**

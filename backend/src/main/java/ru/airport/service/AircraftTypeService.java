@@ -6,9 +6,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.airport.business.AircraftTypeBusinessRules;
 import ru.airport.dto.AircraftTypeRq;
 import ru.airport.dto.AircraftTypeRs;
-import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.AircraftType;
@@ -25,6 +25,7 @@ public class AircraftTypeService {
 
     private final AircraftTypeRepository aircraftTypeRepository;
     private final DtoMapper mapper;
+    private final AircraftTypeBusinessRules aircraftTypeBusinessRules;
 
     @Cacheable(cacheNames = CACHE_AIRCRAFT_TYPES, key = "'all'")
     public List<AircraftTypeRs> findAll() {
@@ -40,9 +41,8 @@ public class AircraftTypeService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRCRAFT_TYPES, allEntries = true)
     public AircraftTypeRs create(AircraftTypeRq rq) {
-        if (aircraftTypeRepository.existsByIcaoCode(rq.getIcaoCode())) {
-            throw new ConflictException("Код ICAO уже занят: " + rq.getIcaoCode());
-        }
+        aircraftTypeBusinessRules.assertIcaoUniqueForCreate(
+                aircraftTypeRepository.existsByIcaoCode(rq.getIcaoCode()), rq.getIcaoCode());
         AircraftType saved = aircraftTypeRepository.save(mapper.newAircraftType(rq));
         return mapper.toAircraftTypeRs(saved);
     }
@@ -51,11 +51,10 @@ public class AircraftTypeService {
     @CacheEvict(cacheNames = CACHE_AIRCRAFT_TYPES, allEntries = true)
     public AircraftTypeRs update(Integer id, AircraftTypeRq rq) {
         AircraftType t = loadType(id);
-        aircraftTypeRepository.findByIcaoCode(rq.getIcaoCode()).ifPresent(other -> {
-            if (!other.getAircraftTypeId().equals(id)) {
-                throw new ConflictException("Код ICAO уже занят: " + rq.getIcaoCode());
-            }
-        });
+        Integer otherId = aircraftTypeRepository.findByIcaoCode(rq.getIcaoCode())
+                .map(AircraftType::getAircraftTypeId)
+                .orElse(null);
+        aircraftTypeBusinessRules.assertIcaoUniqueForUpdate(id, rq.getIcaoCode(), otherId);
         mapper.apply(rq, t);
         return mapper.toAircraftTypeRs(aircraftTypeRepository.save(t));
     }
