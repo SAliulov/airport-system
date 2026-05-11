@@ -1,10 +1,5 @@
 package ru.airport.controller;
 
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,49 +29,37 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/schedules")
 @RequiredArgsConstructor
-@Tag(name = "Schedules")
-@ApiResponses({
-        @ApiResponse(
-                responseCode = "404",
-                description = "Расписание не найдено. Тело: {\"error\", \"resource\", \"id\"}.")
-})
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
     private final ScheduleExportService scheduleExportService;
 
-    /**
-     * Фильтры: дата (плановый вылет в этот день), авиакомпания, статус рейсов в этот день,
-     * поиск по номеру рейса, направление (IATA вылета или прилёта) — FirstLab §2, задача 2.
-     */
     @GetMapping
-    public List<ScheduleRs> list(
-            @Parameter(
-                    name = "date",
-                    description = "День планового вылета (yyyy-MM-dd).",
-                    example = "2026-05-01",
-                    schema = @Schema(type = "string", format = "date"))
+    public List<ScheduleRs> listAll() {
+        return scheduleService.listAll();
+    }
+
+    @GetMapping("/filter")
+    public List<ScheduleRs> filter(
             @RequestParam(name = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @Parameter(
-                    name = "airline",
-                    description = "Идентификатор авиакомпании (`airline_id`), см. GET /api/v1/airlines.")
             @RequestParam(name = "airline", required = false) Integer airline,
-            @Parameter(
-                    name = "status",
-                    description = "Фильтр по статусу выполняемых рейсов (flight) в календарный день `date`; не поле шаблона расписания. В `ScheduleRs` статус рейса не возвращается — смотрите сущность flight / список рейсов.",
-                    schema = @Schema(
-                            type = "string",
-                            allowableValues = {"SCHEDULED", "DEPARTED", "ARRIVED", "DELAYED", "CANCELLED"}))
             @RequestParam(name = "status", required = false) String status,
-            @Parameter(name = "search", description = "Подстрока в номере рейса (без учёта регистра).")
-            @RequestParam(name = "search", required = false) String search,
-            @Parameter(
-                    name = "direction",
-                    description = "IATA аэропорта вылета или прилёта; фильтр по origin или destination.")
             @RequestParam(name = "direction", required = false) String direction
     ) {
-        return scheduleService.list(date, airline, status, search, direction);
+        return scheduleService.filter(date, airline, status, direction);
+    }
+
+    @GetMapping("/search")
+    public List<ScheduleRs> search(
+            @RequestParam(name = "query") String query,
+            @RequestParam(name = "date", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(name = "airline", required = false) Integer airline,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "direction", required = false) String direction
+    ) {
+        return scheduleService.search(query, date, airline, status, direction);
     }
 
     @GetMapping("/{id}")

@@ -40,7 +40,7 @@ import java.util.Map;
  * колонки «Status» и «Gate» подставляются из связанного {@code flight} за этот день, если запись есть;
  * иначе «—» (план есть, выполняемый рейс ещё не создан).
  * PDF: кириллица через {@code /fonts/NotoSans-Regular.ttf}; без файла — подстановка «?» для не-ASCII.
- * Требуется HTTP Basic (роль DISPATCHER); без заголовка Authorization — 401, не 500.
+ * Требуется роль DISPATCHER (JWT Bearer); без заголовка Authorization — 401.
  */
 @Service
 @RequiredArgsConstructor
@@ -55,7 +55,7 @@ public class ScheduleExportService {
     private final DtoMapper mapper;
 
     public byte[] exportExcel(LocalDate date) throws IOException {
-        List<ScheduleRs> schedules = scheduleService.list(date, null, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null);
         Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sh = wb.createSheet("Flights");
@@ -80,7 +80,7 @@ public class ScheduleExportService {
     }
 
     public byte[] exportPdf(LocalDate date) {
-        List<ScheduleRs> schedules = scheduleService.list(date, null, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null);
         Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
         PdfFont font = loadPdfBodyFont();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

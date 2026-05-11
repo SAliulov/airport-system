@@ -11,6 +11,7 @@ import java.util.Optional;
 
 /**
  * Репозиторий гейтов аэропорта.
+ * Удаление: методы {@link JpaRepository#delete}, {@link JpaRepository#deleteById}.
  */
 public interface GateRepository extends JpaRepository<Gate, Integer> {
 

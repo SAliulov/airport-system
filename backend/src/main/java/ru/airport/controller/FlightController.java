@@ -1,11 +1,5 @@
 package ru.airport.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -36,45 +30,36 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/flights")
 @RequiredArgsConstructor
-@Tag(name = "Flights")
-@ApiResponses({
-        @ApiResponse(
-                responseCode = "404",
-                description = "Рейс или связанная сущность не найдены. Тело: {\"error\", \"resource\", \"id\"}.")
-})
 public class FlightController {
 
     private final FlightService flightService;
 
-    /**
-     * Табло FirstLab §2: дата, статус, авиакомпания, направление (IATA аэропорта вылета или прилёта).
-     */
     @GetMapping
-    public List<FlightRs> list(
-            @Parameter(
-                    name = "date",
-                    description = "Календарный день планового вылета (только дата, формат yyyy-MM-dd, не ISO date-time).",
-                    example = "2026-05-01",
-                    schema = @Schema(type = "string", format = "date"))
+    public List<FlightRs> listAll() {
+        return flightService.listAll();
+    }
+
+    @GetMapping("/filter")
+    public List<FlightRs> filter(
             @RequestParam(name = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @Parameter(
-                    name = "status",
-                    description = "Статус выполняемого рейса (flight), строка как у enum.",
-                    schema = @Schema(
-                            type = "string",
-                            allowableValues = {"SCHEDULED", "DEPARTED", "ARRIVED", "DELAYED", "CANCELLED"}))
             @RequestParam(name = "status", required = false) String status,
-            @Parameter(
-                    name = "airline",
-                    description = "Идентификатор авиакомпании в БД (`airline_id`), см. GET /api/v1/airlines.")
             @RequestParam(name = "airline", required = false) Integer airline,
-            @Parameter(
-                    name = "direction",
-                    description = "IATA аэропорта вылета или прилёта (3 буквы); фильтр по совпадению с origin или destination.")
             @RequestParam(name = "direction", required = false) String direction
     ) {
-        return flightService.list(date, status, airline, direction);
+        return flightService.filter(date, status, airline, direction);
+    }
+
+    @GetMapping("/search")
+    public List<FlightRs> search(
+            @RequestParam(name = "query") String query,
+            @RequestParam(name = "date", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "airline", required = false) Integer airline,
+            @RequestParam(name = "direction", required = false) String direction
+    ) {
+        return flightService.search(query, date, status, airline, direction);
     }
 
     @GetMapping("/{id}")
@@ -88,6 +73,11 @@ public class FlightController {
         return flightService.create(rq);
     }
 
+    @PutMapping("/{id}")
+    public FlightRs update(@PathVariable("id") Integer id, @RequestBody @Valid FlightRq rq) {
+        return flightService.update(id, rq);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable("id") Integer id) {
@@ -95,39 +85,28 @@ public class FlightController {
     }
 
     @PutMapping("/{id}/status")
-    @ApiResponse(
-            responseCode = "409",
-            description = "Недопустимая смена статуса. Тело: {\"error\"}.")
     public FlightRs updateStatus(@PathVariable("id") Integer id, @RequestBody @Valid FlightStatusUpdateRq rq) {
         return flightService.updateStatus(id, rq);
     }
 
     @PutMapping("/{id}/aircraft")
-    @ApiResponse(
-            responseCode = "409",
-            description = "Несовместимость типа ВС с гейтом или другое правило. Тело: {\"error\"}.")
     public FlightRs assignAircraft(@PathVariable("id") Integer id, @RequestBody @Valid FlightAircraftAssignmentRq rq) {
         return flightService.assignAircraft(id, rq);
     }
 
     @PostMapping("/{id}/gate-assignment")
     @ResponseStatus(HttpStatus.CREATED)
-    @ApiResponse(
-            responseCode = "409",
-            description = "Гейт занят, неактивен или несовместим с ВС. Тело: {\"error\"}.")
     public GateAssignmentRs assignGate(@PathVariable("id") Integer id, @RequestBody @Valid GateAssignmentRq rq) {
         return flightService.assignGate(id, rq);
     }
 
     @GetMapping("/{id}/delay-warnings")
-    @Operation(summary = "Предупреждения о задержке по рейсу", description = "Вложенный ресурс под `/flights/{id}`; отдельного контроллера нет (см. AGENTS §8).")
     public List<DelayWarningRs> listDelayWarnings(@PathVariable("id") Integer id) {
         return flightService.listDelayWarnings(id);
     }
 
     @PostMapping("/{id}/delay-warnings")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Создать предупреждение о задержке", description = "DISPATCHER; тот же вложенный путь `/flights/{id}/delay-warnings`.")
     public DelayWarningRs addDelayWarning(@PathVariable("id") Integer id, @RequestBody @Valid DelayWarningRq rq) {
         return flightService.addDelayWarning(id, rq);
     }

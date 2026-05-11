@@ -28,6 +28,7 @@ import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.GateAssignmentRepository;
 import ru.airport.repository.GateRepository;
 import ru.airport.repository.ScheduleRepository;
+import ru.airport.validation.FlightStatusParser;
 import ru.airport.websocket.RealtimeNotificationService;
 
 import java.time.LocalDate;
@@ -56,17 +57,40 @@ public class FlightService {
      *
      * @param statusRaw значение query {@code status} (имя enum), парсится здесь — контроллер не зависит от {@link FlightStatus}.
      */
-    public List<FlightRs> list(LocalDate date, String statusRaw, Integer airlineId, String direction) {
+    public List<FlightRs> listAll() {
+        return flightRepository.findAllForApiList().stream()
+                .map(mapper::toFlightRsSummary)
+                .toList();
+    }
+
+    public List<FlightRs> filter(LocalDate date, String statusRaw, Integer airlineId, String direction) {
+        return findFlights(date, statusRaw, airlineId, direction, null);
+    }
+
+    public List<FlightRs> search(String query, LocalDate date, String statusRaw, Integer airlineId, String direction) {
+        return findFlights(date, statusRaw, airlineId, direction, query);
+    }
+
+    private List<FlightRs> findFlights(
+            LocalDate date,
+            String statusRaw,
+            Integer airlineId,
+            String direction,
+            String flightNumberQuery
+    ) {
         FlightStatus status = FlightStatusParser.parseOptional(statusRaw);
         LocalDateTime dayStart = date != null ? date.atStartOfDay() : null;
         LocalDateTime dayEnd = date != null ? date.plusDays(1).atStartOfDay() : null;
         String dir = normalizeAirport(direction);
+        String normalizedQuery = normalizeSearchQuery(flightNumberQuery);
 
         List<Flight> flights;
-        if (dayStart == null && dayEnd == null && status == null && airlineId == null && dir == null) {
+        if (dayStart == null && dayEnd == null && status == null && airlineId == null && dir == null
+                && normalizedQuery == null) {
             flights = flightRepository.findAllForApiList();
         } else {
-            flights = flightRepository.findAll(FlightSpecifications.forApiList(dayStart, dayEnd, status, airlineId));
+            flights = flightRepository.findAll(
+                    FlightSpecifications.forApiList(dayStart, dayEnd, status, airlineId, normalizedQuery));
         }
 
         Stream<Flight> stream = flights.stream();
@@ -74,6 +98,13 @@ public class FlightService {
             stream = stream.filter(f -> matchesAirportDirection(f, dir));
         }
         return stream.map(mapper::toFlightRsSummary).toList();
+    }
+
+    private static String normalizeSearchQuery(String query) {
+        if (query == null || query.isBlank()) {
+            return null;
+        }
+        return query.trim();
     }
 
     private static String normalizeAirport(String direction) {
@@ -124,6 +155,18 @@ public class FlightService {
     }
 
     @Transactional
+    public FlightRs update(Integer flightId, FlightRq rq) {
+        Flight flight = loadFlight(flightId);
+        Schedule schedule = scheduleRepository.findById(rq.getScheduleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", rq.getScheduleId()));
+        flight.setSchedule(schedule);
+        Flight saved = flightRepository.save(flight);
+        FlightRs rs = mapper.toFlightRsSummary(saved);
+        realtimeNotificationService.publishFlightUpdate(rs);
+        return rs;
+    }
+
+    @Transactional
     public FlightRs updateStatus(Integer flightId, FlightStatusUpdateRq rq) {
         Flight flight = loadFlight(flightId);
         flightStatusBusinessRules.assertManualTransition(flight.getStatus(), rq.getStatus());
@@ -163,7 +206,7 @@ public class FlightService {
                 gate.getGateId(),
                 rq.getAssignedFrom(),
                 rq.getAssignedTo(),
-                flight.getFlightId()
+                null
         );
         gateAssignmentBusinessRules.assertNoOverlaps(overlaps);
         gateAssignmentBusinessRules.assertAircraftFitsGate(flight.getAircraftType(), gate);

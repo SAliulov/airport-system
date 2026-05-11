@@ -1,7 +1,6 @@
-package ru.airport.service;
+package ru.airport.validation;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import ru.airport.exception.BadRequestException;
 import ru.airport.model.FlightStatus;
 
 /**
@@ -22,8 +21,7 @@ public final class FlightStatusParser {
         try {
             return FlightStatus.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new BadRequestException(
                     "Некорректный параметр status: «" + raw + "»; ожидается одно из: SCHEDULED, DEPARTED, ARRIVED, DELAYED, CANCELLED");
         }
     }

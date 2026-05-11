@@ -1,6 +1,5 @@
 package ru.airport.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -33,6 +32,5 @@ public class GateRq {
     private Boolean isActive;
 
     @NotNull
-    @Schema(description = "NARROW, WIDE или JUMBO", example = "WIDE")
     private SizeCategory maxSizeCategory;
 }

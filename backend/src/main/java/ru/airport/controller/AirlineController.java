@@ -1,8 +1,5 @@
 package ru.airport.controller;
 
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,12 +21,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/airlines")
 @RequiredArgsConstructor
-@Tag(name = "Airlines")
-@ApiResponses({
-        @ApiResponse(
-                responseCode = "404",
-                description = "Авиакомпания не найдена. Тело: {\"error\", \"resource\", \"id\"}.")
-})
 public class AirlineController {
 
     private final AirlineService airlineService;
@@ -46,17 +37,11 @@ public class AirlineController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @ApiResponse(
-            responseCode = "409",
-            description = "IATA-код уже занят. Тело: {\"error\"}.")
     public AirlineRs create(@RequestBody @Valid AirlineRq rq) {
         return airlineService.create(rq);
     }
 
     @PutMapping("/{id}")
-    @ApiResponse(
-            responseCode = "409",
-            description = "IATA-код уже занят другой записью. Тело: {\"error\"}.")
     public AirlineRs update(@PathVariable("id") Integer id, @RequestBody @Valid AirlineRq rq) {
         return airlineService.update(id, rq);
     }

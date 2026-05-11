@@ -126,19 +126,19 @@ class AirportJpaRepositoriesIT {
         LocalDateTime start = day.atStartOfDay();
         LocalDateTime end = day.plusDays(1).atStartOfDay();
 
-        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.SCHEDULED, null)))
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.SCHEDULED, null, null)))
                 .extracting(Flight::getFlightId)
                 .contains(flight.getFlightId());
 
-        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.ARRIVED, null)))
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, FlightStatus.ARRIVED, null, null)))
                 .extracting(Flight::getFlightId)
                 .doesNotContain(flight.getFlightId());
 
-        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, null, su.getAirlineId())))
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(start, end, null, su.getAirlineId(), null)))
                 .extracting(Flight::getFlightId)
                 .contains(flight.getFlightId());
 
-        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(null, null, FlightStatus.SCHEDULED, null)))
+        assertThat(flightRepository.findAll(FlightSpecifications.forApiList(null, null, FlightStatus.SCHEDULED, null, null)))
                 .extracting(Flight::getFlightId)
                 .contains(flight.getFlightId());
     }

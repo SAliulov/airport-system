@@ -49,3 +49,10 @@ AGENTS.md
 
 # Examples
 Лекция 8/
+*.md
+*.txt
+*.puml
+*.pdf
+*.docx
+*ps1
+*.py
