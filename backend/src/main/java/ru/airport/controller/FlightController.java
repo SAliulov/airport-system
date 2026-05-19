@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import ru.airport.dto.AircraftTypeRs;
 import ru.airport.dto.DelayWarningRq;
 import ru.airport.dto.DelayWarningRs;
 import ru.airport.dto.FlightAircraftAssignmentRq;
+import ru.airport.dto.GateRs;
 import ru.airport.dto.FlightRq;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.FlightStatusUpdateRq;
@@ -45,9 +47,11 @@ public class FlightController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "airline", required = false) Integer airline,
-            @RequestParam(name = "direction", required = false) String direction
+            @RequestParam(name = "direction", required = false) String direction,
+            @RequestParam(name = "origin", required = false) String origin,
+            @RequestParam(name = "destination", required = false) String destination
     ) {
-        return flightService.filter(date, status, airline, direction);
+        return flightService.filter(date, status, airline, direction, origin, destination);
     }
 
     @GetMapping("/search")
@@ -57,9 +61,11 @@ public class FlightController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "airline", required = false) Integer airline,
-            @RequestParam(name = "direction", required = false) String direction
+            @RequestParam(name = "direction", required = false) String direction,
+            @RequestParam(name = "origin", required = false) String origin,
+            @RequestParam(name = "destination", required = false) String destination
     ) {
-        return flightService.search(query, date, status, airline, direction);
+        return flightService.search(query, date, status, airline, direction, origin, destination);
     }
 
     @GetMapping("/{id}")
@@ -98,6 +104,16 @@ public class FlightController {
     @ResponseStatus(HttpStatus.CREATED)
     public GateAssignmentRs assignGate(@PathVariable("id") Integer id, @RequestBody @Valid GateAssignmentRq rq) {
         return flightService.assignGate(id, rq);
+    }
+
+    @GetMapping("/{id}/available-gates")
+    public List<GateRs> listAvailableGates(@PathVariable("id") Integer id) {
+        return flightService.listAvailableGates(id);
+    }
+
+    @GetMapping("/{id}/compatible-aircraft-types")
+    public List<AircraftTypeRs> listCompatibleAircraftTypes(@PathVariable("id") Integer id) {
+        return flightService.listCompatibleAircraftTypes(id);
     }
 
     @GetMapping("/{id}/delay-warnings")

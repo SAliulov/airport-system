@@ -9,25 +9,22 @@ import ru.airport.model.FlightStatus;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Репозиторий конкретных выполняемых рейсов.
- * Центральный репозиторий системы.
  */
 public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpecificationExecutor<Flight> {
 
     boolean existsBySchedule_ScheduleId(Integer scheduleId);
 
+    boolean existsByAircraftType_AircraftTypeId(Integer aircraftTypeId);
+
     List<Flight> findByStatus(FlightStatus status);
 
     List<Flight> findBySchedule_ScheduleId(Integer scheduleId);
 
-    /**
-     * Рейсы по статусу с плановым вылетом в указанный день.
-     * Используется для фильтрации расписания (задача 2).
-     */
     @Query("""
             SELECT f FROM Flight f
             JOIN f.schedule s
@@ -37,50 +34,28 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
             """)
     List<Flight> findByDay(
             @Param("dayStart") LocalDateTime dayStart,
-            @Param("dayEnd") LocalDateTime dayEnd
-    );
+            @Param("dayEnd") LocalDateTime dayEnd);
 
     /**
-     * Рейсы со статусом SCHEDULED или DELAYED,
-     * у которых плановое время вылета уже наступило.
-     * Используется планировщиком для автообновления статуса (задача 3).
+     * Кандидаты для планировщика: активные статусы, правила направления — в {@link ru.airport.service.FlightAutoStatusService}.
      */
     @Query("""
-            SELECT f FROM Flight f
-            JOIN f.schedule s
-            WHERE f.status IN (:departureStatuses)
-              AND s.scheduledDeparture <= :now
+            SELECT DISTINCT f FROM Flight f
+            JOIN FETCH f.schedule s
+            LEFT JOIN FETCH f.aircraftType
+            WHERE f.status IN (:statuses)
             """)
-    List<Flight> findReadyToDeparture(
-            @Param("now") LocalDateTime now,
-            @Param("departureStatuses") Collection<FlightStatus> departureStatuses);
+    List<Flight> findForAutoStatusProcessing(@Param("statuses") Collection<FlightStatus> statuses);
 
-    default List<Flight> findReadyToDeparture(LocalDateTime now) {
-        return findReadyToDeparture(now, EnumSet.of(FlightStatus.SCHEDULED, FlightStatus.DELAYED));
-    }
-
-    /**
-     * Рейсы со статусом DEPARTED,
-     * у которых плановое время прилёта уже наступило.
-     * Используется планировщиком для автообновления статуса (задача 3).
-     */
     @Query("""
             SELECT f FROM Flight f
-            JOIN f.schedule s
-            WHERE f.status = :status
-              AND s.scheduledArrival <= :now
+            JOIN FETCH f.schedule s
+            LEFT JOIN FETCH f.aircraftType
+            LEFT JOIN FETCH f.gateAssignments
+            WHERE f.flightId = :flightId
             """)
-    List<Flight> findReadyToArrive(
-            @Param("now") LocalDateTime now,
-            @Param("status") FlightStatus status);
+    Optional<Flight> findByIdForAutoProcessing(@Param("flightId") Integer flightId);
 
-    default List<Flight> findReadyToArrive(LocalDateTime now) {
-        return findReadyToArrive(now, FlightStatus.DEPARTED);
-    }
-
-    /**
-     * Все рейсы для списка API (без фильтров). Фильтр по направлению (IATA) делается в сервисе из-за {@code char(3)} в БД.
-     */
     @Query("""
             SELECT DISTINCT f FROM Flight f
             JOIN FETCH f.schedule s
@@ -89,5 +64,4 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
             ORDER BY s.scheduledDeparture
             """)
     List<Flight> findAllForApiList();
-
 }

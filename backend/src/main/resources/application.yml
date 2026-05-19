@@ -25,11 +25,23 @@ spring:
 server:
   port: 8080
 
+logging:
+  level:
+    ru.airport.service.FlightAutoStatusService: INFO
+    ru.airport.service.FlightAutoStatusProcessor: INFO
+    ru.airport.scheduler.FlightStatusScheduler: INFO
+
 jwt:
   secret: airport-secret-key-change-in-production-must-be-long
   expiration: 86400000          # 24 часа в миллисекундах
 
-# Интервал автообновления статусов рейсов (мс), задача 3 FirstLab
+# Домашний аэропорт АОС (IATA) и планировщик статусов рейсов
 airport:
+  home-iata: SVO
+  timezone: Europe/Moscow
   scheduler:
     flight-status-ms: 60000
+    outbound-delay-grace-minutes: 5
+    inbound-gate-delay-minutes: 5
+    auto-cancel-hours-after-scheduled-departure: 24
+    max-actual-time-future-skew-minutes: 120

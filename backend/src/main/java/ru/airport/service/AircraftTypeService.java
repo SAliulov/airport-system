@@ -13,6 +13,7 @@ import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.AircraftType;
 import ru.airport.repository.AircraftTypeRepository;
+import ru.airport.repository.FlightRepository;
 import ru.airport.validation.TextNormalization;
 
 import java.util.List;
@@ -25,6 +26,7 @@ public class AircraftTypeService {
     public static final String CACHE_AIRCRAFT_TYPES = "aircraftTypes";
 
     private final AircraftTypeRepository aircraftTypeRepository;
+    private final FlightRepository flightRepository;
     private final DtoMapper mapper;
     private final AircraftTypeBusinessRules aircraftTypeBusinessRules;
 
@@ -58,6 +60,10 @@ public class AircraftTypeService {
                 .map(AircraftType::getAircraftTypeId)
                 .orElse(null);
         aircraftTypeBusinessRules.assertIcaoUniqueForUpdate(id, rq.getIcaoCode(), otherId);
+        aircraftTypeBusinessRules.assertSizeCategoryUnchangedIfInUse(
+                t.getSizeCategory(),
+                rq.getSizeCategory(),
+                flightRepository.existsByAircraftType_AircraftTypeId(id));
         mapper.apply(rq, t);
         return mapper.toAircraftTypeRs(aircraftTypeRepository.save(t));
     }
@@ -65,7 +71,10 @@ public class AircraftTypeService {
     @Transactional
     @CacheEvict(cacheNames = CACHE_AIRCRAFT_TYPES, allEntries = true)
     public void delete(Integer id) {
-        aircraftTypeRepository.delete(loadType(id));
+        AircraftType t = loadType(id);
+        aircraftTypeBusinessRules.assertMayDelete(
+                flightRepository.existsByAircraftType_AircraftTypeId(id));
+        aircraftTypeRepository.delete(t);
     }
 
     public AircraftType getReferenceById(Integer id) {

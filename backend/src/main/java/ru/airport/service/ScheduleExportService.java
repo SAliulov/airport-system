@@ -55,7 +55,7 @@ public class ScheduleExportService {
     private final DtoMapper mapper;
 
     public byte[] exportExcel(LocalDate date) throws IOException {
-        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null, null, null);
         Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sh = wb.createSheet("Flights");
@@ -80,7 +80,7 @@ public class ScheduleExportService {
     }
 
     public byte[] exportPdf(LocalDate date) {
-        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null);
+        List<ScheduleRs> schedules = scheduleService.filter(date, null, null, null, null, null);
         Map<Integer, FlightRs> flightByScheduleId = indexFlightsForDay(date);
         PdfFont font = loadPdfBodyFont();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

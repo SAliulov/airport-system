@@ -8,7 +8,7 @@ package ru.airport.model;
  * Допустимые переходы:
  *   SCHEDULED → DEPARTED  (авто: NOW >= scheduled_departure)
  *   DEPARTED  → ARRIVED   (авто: NOW >= scheduled_arrival)
- *   SCHEDULED → DELAYED   (вручную диспетчером)
+ *   SCHEDULED → DELAYED   (вручную диспетчером; авто: scheduled_departure + 5 мин без вылета)
  *   SCHEDULED → CANCELLED (вручную диспетчером)
  *   DELAYED   → DEPARTED  (авто или вручную)
  *   DELAYED   → CANCELLED (вручную)

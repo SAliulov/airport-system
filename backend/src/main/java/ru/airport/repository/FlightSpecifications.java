@@ -30,7 +30,8 @@ public final class FlightSpecifications {
             LocalDateTime dayStart,
             LocalDateTime dayEnd,
             FlightStatus status,
-            Integer airlineId) {
+            Integer airlineId,
+            String flightNumberQuery) {
         return (root, query, cb) -> {
             // Только join (без fetch): fetch в Specification + DISTINCT даёт на PostgreSQL
             // ошибку вида «ORDER BY выражения должны входить в SELECT при DISTINCT» и 500 на API.
@@ -51,6 +52,11 @@ public final class FlightSpecifications {
             }
             if (airlineId != null) {
                 predicates.add(cb.equal(airlineJoin.get("airlineId"), airlineId));
+            }
+            if (flightNumberQuery != null && !flightNumberQuery.isBlank()) {
+                predicates.add(cb.like(
+                        cb.lower(scheduleJoin.get("flightNumber")),
+                        "%" + flightNumberQuery.trim().toLowerCase() + "%"));
             }
 
             query.orderBy(cb.asc(scheduleJoin.get("scheduledDeparture")));

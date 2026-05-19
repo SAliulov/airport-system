@@ -1,9 +1,7 @@
 package ru.airport.business;
 
-import org.springframework.stereotype.Component;
 import ru.airport.exception.ConflictException;
 
-@Component
 public class GateBusinessRules {
 
     public void assertGateNumberUniqueForCreate(boolean numberTaken, String gateNumber) {

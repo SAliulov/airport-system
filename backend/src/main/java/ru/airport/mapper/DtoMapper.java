@@ -115,6 +115,7 @@ public class DtoMapper {
                 .gateId(g.getGateId())
                 .gateNumber(g.getGateNumber())
                 .terminal(g.getTerminal())
+                .maxSizeCategory(g.getMaxSizeCategory())
                 .build();
     }
 

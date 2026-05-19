@@ -1,9 +1,11 @@
 package ru.airport.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.ScheduleBusinessRules;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
@@ -39,6 +41,9 @@ public class ScheduleService {
     private final DtoMapper mapper;
     private final ScheduleBusinessRules scheduleBusinessRules;
 
+    @Value("${airport.home-iata}")
+    private String homeIata;
+
     /**
      * Все расписания без фильтров (GET /schedules).
      */
@@ -53,8 +58,15 @@ public class ScheduleService {
      *
      * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
      */
-    public List<ScheduleRs> filter(LocalDate date, Integer airlineId, String statusRaw, String direction) {
-        return findSchedules(date, airlineId, statusRaw, null, direction);
+    public List<ScheduleRs> filter(
+            LocalDate date,
+            Integer airlineId,
+            String statusRaw,
+            String direction,
+            String origin,
+            String destination
+    ) {
+        return findSchedules(date, airlineId, statusRaw, null, direction, origin, destination);
     }
 
     /**
@@ -63,8 +75,16 @@ public class ScheduleService {
      * @param query     подстрока для поиска в номере рейса (обязательно)
      * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
      */
-    public List<ScheduleRs> search(String query, LocalDate date, Integer airlineId, String statusRaw, String direction) {
-        return findSchedules(date, airlineId, statusRaw, query, direction);
+    public List<ScheduleRs> search(
+            String query,
+            LocalDate date,
+            Integer airlineId,
+            String statusRaw,
+            String direction,
+            String origin,
+            String destination
+    ) {
+        return findSchedules(date, airlineId, statusRaw, query, direction, origin, destination);
     }
 
     private List<ScheduleRs> findSchedules(
@@ -72,19 +92,29 @@ public class ScheduleService {
             Integer airlineId,
             String statusRaw,
             String search,
-            String direction
+            String direction,
+            String origin,
+            String destination
     ) {
         FlightStatus status = FlightStatusParser.parseOptional(statusRaw);
         List<Schedule> candidates = resolveCandidates(date, status);
         String q = search != null ? search.trim() : "";
         String dir = normalizeAirport(direction);
+        String originIata = normalizeAirport(origin);
+        String destinationIata = normalizeAirport(destination);
         return candidates.stream()
                 .filter(s -> airlineId == null || s.getAirline().getAirlineId().equals(airlineId))
                 .filter(s -> q.isEmpty() || s.getFlightNumber().toLowerCase().contains(q.toLowerCase()))
-                .filter(s -> dir == null || matchesDirection(s, dir))
+                .filter(s -> originIata == null || originIata.equals(trimUpper(s.getOriginAirport())))
+                .filter(s -> destinationIata == null || destinationIata.equals(trimUpper(s.getDestinationAirport())))
+                .filter(s -> dir == null || originIata != null || destinationIata != null || matchesDirection(s, dir))
                 .sorted(Comparator.comparing(Schedule::getScheduledDeparture))
                 .map(mapper::toScheduleRs)
                 .toList();
+    }
+
+    private static String trimUpper(String code) {
+        return code == null ? "" : code.trim().toUpperCase();
     }
 
     private static String normalizeAirport(String direction) {
@@ -138,7 +168,9 @@ public class ScheduleService {
         TextNormalization.normalizeScheduleAirports(rq);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
-        Schedule saved = scheduleRepository.save(mapper.newSchedule(rq, airline));
+        Schedule draft = mapper.newSchedule(rq, airline);
+        FlightHomeAirportRules.assertScheduleIncludesHome(draft, homeIata);
+        Schedule saved = scheduleRepository.save(draft);
         return mapper.toScheduleRs(saved);
     }
 
@@ -149,6 +181,7 @@ public class ScheduleService {
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
         mapper.apply(rq, s, airline);
+        FlightHomeAirportRules.assertScheduleIncludesHome(s, homeIata);
         return mapper.toScheduleRs(scheduleRepository.save(s));
     }
 

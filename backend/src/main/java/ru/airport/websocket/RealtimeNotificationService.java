@@ -1,13 +1,14 @@
 package ru.airport.websocket;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import ru.airport.dto.DelayWarningRs;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.GateAssignmentRs;
-import ru.airport.websocket.payload.DelayWarningPush;
-import ru.airport.websocket.payload.GateAssignmentPush;
+import ru.airport.event.DelayWarningEvent;
+import ru.airport.event.FlightUpdateEvent;
+import ru.airport.event.GateChangeEvent;
 
 /**
  * Рассылка событий клиентам (табло, мобилка) — вызывается из прикладных сервисов и планировщика.
@@ -16,17 +17,17 @@ import ru.airport.websocket.payload.GateAssignmentPush;
 @RequiredArgsConstructor
 public class RealtimeNotificationService {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void publishFlightUpdate(FlightRs flight) {
-        messagingTemplate.convertAndSend("/topic/flights", flight);
+        eventPublisher.publishEvent(new FlightUpdateEvent(flight));
     }
 
     public void publishDelayWarning(Integer flightId, DelayWarningRs warning) {
-        messagingTemplate.convertAndSend("/topic/delays", new DelayWarningPush(flightId, warning));
+        eventPublisher.publishEvent(new DelayWarningEvent(flightId, warning));
     }
 
     public void publishGateChange(Integer flightId, GateAssignmentRs assignment) {
-        messagingTemplate.convertAndSend("/topic/gate-changes", new GateAssignmentPush(flightId, assignment));
+        eventPublisher.publishEvent(new GateChangeEvent(flightId, assignment));
     }
 }

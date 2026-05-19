@@ -20,6 +20,7 @@ import ru.airport.testsupport.DockerConditions;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,49 +60,49 @@ class AirportJpaRepositoriesIT {
     void findActiveGatesCompatibleWithAircraftSize_matchesSizeCategorySemantics() {
         assertThat(gateRepository.findActiveGatesCompatibleWithAircraftSize(SizeCategory.NARROW))
                 .extracting(Gate::getGateNumber)
-                .contains("A1", "A2", "B1", "B2");
+                .contains("101", "105", "121");
 
         assertThat(gateRepository.findActiveGatesCompatibleWithAircraftSize(SizeCategory.WIDE))
                 .extracting(Gate::getGateNumber)
-                .contains("A2", "B2")
-                .doesNotContain("A1", "B1");
+                .contains("106", "126")
+                .doesNotContain("101", "121");
 
         assertThat(gateRepository.findActiveGatesCompatibleWithAircraftSize(SizeCategory.JUMBO))
                 .extracting(Gate::getGateNumber)
-                .containsExactly("B2");
+                .containsExactly("111");
     }
 
     @Test
-    void findReadyToDeparture_andArrive_useEnumBindParameters() {
+    void findForAutoStatusProcessing_loadsScheduleForActiveStatuses() {
         Airline su = airlineRepository.findByIataCode("SU").orElseThrow();
-        Schedule schedule = Schedule.builder()
+        Schedule schedule = scheduleRepository.save(Schedule.builder()
                 .flightNumber("SU999")
                 .originAirport("SVO")
                 .destinationAirport("LED")
                 .scheduledDeparture(LocalDateTime.of(2026, 3, 29, 10, 0))
                 .scheduledArrival(LocalDateTime.of(2026, 3, 29, 11, 0))
                 .airline(su)
-                .build();
-        schedule = scheduleRepository.save(schedule);
+                .build());
 
-        Flight flight = Flight.builder()
+        Flight scheduled = flightRepository.save(Flight.builder()
                 .schedule(schedule)
                 .status(FlightStatus.SCHEDULED)
-                .build();
-        flight = flightRepository.save(flight);
+                .build());
+        Flight departed = flightRepository.save(Flight.builder()
+                .schedule(schedule)
+                .status(FlightStatus.DEPARTED)
+                .actualDeparture(LocalDateTime.of(2026, 3, 29, 10, 5))
+                .build());
+        Flight arrived = flightRepository.save(Flight.builder()
+                .schedule(schedule)
+                .status(FlightStatus.ARRIVED)
+                .build());
 
-        LocalDateTime afterDeparture = LocalDateTime.of(2026, 3, 29, 10, 30);
-        assertThat(flightRepository.findReadyToDeparture(afterDeparture))
+        assertThat(flightRepository.findForAutoStatusProcessing(
+                EnumSet.of(FlightStatus.SCHEDULED, FlightStatus.DELAYED, FlightStatus.DEPARTED)))
                 .extracting(Flight::getFlightId)
-                .contains(flight.getFlightId());
-
-        flight.setStatus(FlightStatus.DEPARTED);
-        flightRepository.save(flight);
-
-        LocalDateTime afterArrival = LocalDateTime.of(2026, 3, 29, 11, 30);
-        assertThat(flightRepository.findReadyToArrive(afterArrival))
-                .extracting(Flight::getFlightId)
-                .contains(flight.getFlightId());
+                .contains(scheduled.getFlightId(), departed.getFlightId())
+                .doesNotContain(arrived.getFlightId());
     }
 
     @Test

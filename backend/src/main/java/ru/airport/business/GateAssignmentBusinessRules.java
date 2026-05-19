@@ -1,6 +1,5 @@
 package ru.airport.business;
 
-import org.springframework.stereotype.Component;
 import ru.airport.exception.ConflictException;
 import ru.airport.model.AircraftType;
 import ru.airport.model.Gate;
@@ -13,7 +12,6 @@ import java.util.List;
 /**
  * Правила назначения гейта: интервал времени, активность гейта, отсутствие пересечений, размер ВС.
  */
-@Component
 public class GateAssignmentBusinessRules {
 
     public void assertValidInterval(LocalDateTime from, LocalDateTime to) {
@@ -35,9 +33,6 @@ public class GateAssignmentBusinessRules {
         }
     }
 
-    /**
-     * Если тип ВС ещё не назначен на рейс, проверка пропускается.
-     */
     public void assertAircraftFitsGate(AircraftType aircraft, Gate gate) {
         if (aircraft == null) {
             return;

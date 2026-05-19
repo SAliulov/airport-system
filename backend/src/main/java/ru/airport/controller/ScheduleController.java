@@ -45,9 +45,11 @@ public class ScheduleController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(name = "airline", required = false) Integer airline,
             @RequestParam(name = "status", required = false) String status,
-            @RequestParam(name = "direction", required = false) String direction
+            @RequestParam(name = "direction", required = false) String direction,
+            @RequestParam(name = "origin", required = false) String origin,
+            @RequestParam(name = "destination", required = false) String destination
     ) {
-        return scheduleService.filter(date, airline, status, direction);
+        return scheduleService.filter(date, airline, status, direction, origin, destination);
     }
 
     @GetMapping("/search")
@@ -57,9 +59,11 @@ public class ScheduleController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(name = "airline", required = false) Integer airline,
             @RequestParam(name = "status", required = false) String status,
-            @RequestParam(name = "direction", required = false) String direction
+            @RequestParam(name = "direction", required = false) String direction,
+            @RequestParam(name = "origin", required = false) String origin,
+            @RequestParam(name = "destination", required = false) String destination
     ) {
-        return scheduleService.search(query, date, airline, status, direction);
+        return scheduleService.search(query, date, airline, status, direction, origin, destination);
     }
 
     @GetMapping("/{id}")

@@ -32,6 +32,10 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private static final List<String> DEV_ORIGIN_PATTERNS = List.of(
+            "http://localhost:*",
+            "http://127.0.0.1:*"
+    );
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -47,6 +51,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/schedules/export/pdf").hasRole("DISPATCHER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/schedules/export/excel").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/flights", "/api/v1/flights/**").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/flights/**").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/flights/**").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/schedules", "/api/v1/schedules/**").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/schedules/**").hasRole("DISPATCHER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/schedules/**").hasRole("DISPATCHER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()
                         .requestMatchers("/api/v1/**").hasRole("DISPATCHER")
                         .anyRequest().authenticated()
@@ -68,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
-        c.setAllowedOriginPatterns(List.of("*"));
+        c.setAllowCredentials(true);
+        c.setAllowedOriginPatterns(DEV_ORIGIN_PATTERNS);
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         c.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

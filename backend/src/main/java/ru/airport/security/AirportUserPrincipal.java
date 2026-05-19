@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * Представление учётной записи в {@link org.springframework.security.core.context.SecurityContext}
- * (аналог {@code UserPrincipal} в учебном примере): id, логин, хеш пароля, роль из сущности {@link User}.
+ * id, логин, хеш пароля, роль из сущности {@link User}.
  */
 @Getter
 public class AirportUserPrincipal implements UserDetails {

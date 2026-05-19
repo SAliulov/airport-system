@@ -1,0 +1,164 @@
+package ru.airport.business;
+
+import ru.airport.exception.BadRequestException;
+import ru.airport.model.Flight;
+import ru.airport.model.Schedule;
+
+import java.time.LocalDateTime;
+
+/**
+ * Правила домашнего аэропорта (АОС): направление рейса и инварианты перехода в DEPARTED/ARRIVED.
+ */
+public final class FlightHomeAirportRules {
+
+    public enum OperationKind {
+        DEPARTURE,
+        ARRIVAL
+    }
+
+    private FlightHomeAirportRules() {
+    }
+
+    public static OperationKind resolveOperationKind(Schedule schedule, String homeIata) {
+        String home = normalize(homeIata);
+        String origin = normalize(schedule.getOriginAirport());
+        String destination = normalize(schedule.getDestinationAirport());
+        boolean fromHome = home.equals(origin);
+        boolean toHome = home.equals(destination);
+        if (fromHome && !toHome) {
+            return OperationKind.DEPARTURE;
+        }
+        if (toHome && !fromHome) {
+            return OperationKind.ARRIVAL;
+        }
+        throw new BadRequestException("Рейс не относится к базовому аэропорту");
+    }
+
+    public static void assertScheduleTouchesHome(Schedule schedule, String homeIata) {
+        resolveOperationKind(schedule, homeIata);
+    }
+
+    public static void assertScheduleIncludesHome(Schedule schedule, String homeIata) {
+        String home = normalize(homeIata);
+        String origin = normalize(schedule.getOriginAirport());
+        String destination = normalize(schedule.getDestinationAirport());
+        if (!home.equals(origin) && !home.equals(destination)) {
+            throw new BadRequestException("Расписание должно включать базовый аэропорт " + home);
+        }
+        if (home.equals(origin) && home.equals(destination)) {
+            throw new BadRequestException("Расписание должно включать базовый аэропорт " + home);
+        }
+    }
+
+    public static void assertManualTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+        touchGateAssignments(flight);
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind != OperationKind.DEPARTURE) {
+            throw new BadRequestException(
+                    "Перевод в статус DEPARTED допустим только для рейсов на вылет из базового аэропорта");
+        }
+        assertHomeDepartureRequirements(flight, actualDeparture);
+    }
+
+    public static void assertManualInboundDeparture(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind != OperationKind.ARRIVAL) {
+            throw new BadRequestException(
+                    "Ручной вылет из аэропорта отправления допустим только для рейсов на прилёт в базовый аэропорт");
+        }
+        assertActualDeparturePresent(actualDeparture);
+        assertAircraftTypeAssigned(flight);
+    }
+
+    /** Прилёт в базовый аэропорт (origin → SVO). */
+    public static void assertManualTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
+        touchGateAssignments(flight);
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind != OperationKind.ARRIVAL) {
+            throw new BadRequestException(
+                    "Перевод в статус ARRIVED в SVO допустим только для рейсов на прилёт в базовый аэропорт");
+        }
+        assertHomeArrivalRequirements(flight, actualArrival);
+    }
+
+    /** Прилёт в пункт назначения (SVO → dest), без гейта в SVO. */
+    public static void assertManualRemoteArrival(Flight flight, String homeIata, LocalDateTime actualArrival) {
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind != OperationKind.DEPARTURE) {
+            throw new BadRequestException(
+                    "Ручной прилёт в пункт назначения допустим только для рейсов на вылет из базового аэропорта");
+        }
+        assertActualArrivalPresent(actualArrival);
+        assertAircraftTypeAssigned(flight);
+    }
+
+    public static void assertAutoTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+        touchGateAssignments(flight);
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind == OperationKind.DEPARTURE) {
+            throw new BadRequestException("Автовылет недоступен для рейсов на вылет из базового аэропорта");
+        }
+        assertAircraftTypeAssigned(flight);
+        assertActualDeparturePresent(actualDeparture);
+    }
+
+    public static void assertAutoTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
+        touchGateAssignments(flight);
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind == OperationKind.ARRIVAL) {
+            assertHomeArrivalRequirements(flight, actualArrival);
+        } else {
+            assertActualDeparturePresent(flight.getActualDeparture());
+            assertActualArrivalPresent(actualArrival);
+            assertAircraftTypeAssigned(flight);
+        }
+    }
+
+    private static void assertHomeDepartureRequirements(Flight flight, LocalDateTime actualDeparture) {
+        assertActualDeparturePresent(actualDeparture);
+        assertAircraftTypeAssigned(flight);
+        if (flight.getActiveGateAssignment() == null) {
+            throw new BadRequestException(
+                    "Для перевода в статус DEPARTED необходимо назначить гейт в базовом аэропорту");
+        }
+    }
+
+    private static void assertHomeArrivalRequirements(Flight flight, LocalDateTime actualArrival) {
+        assertActualArrivalPresent(actualArrival);
+        assertAircraftTypeAssigned(flight);
+        if (flight.getActiveGateAssignment() == null) {
+            throw new BadRequestException(
+                    "Для перевода в статус ARRIVED необходимо назначить гейт в базовом аэропорту");
+        }
+    }
+
+    private static void assertAircraftTypeAssigned(Flight flight) {
+        if (flight.getAircraftType() == null) {
+            throw new BadRequestException("Необходимо назначить тип воздушного судна");
+        }
+    }
+
+    private static void assertActualDeparturePresent(LocalDateTime actualDeparture) {
+        if (actualDeparture == null) {
+            throw new BadRequestException(
+                    "Для перевода в статус DEPARTED необходимо фактическое время вылета (actualDeparture)");
+        }
+    }
+
+    private static void assertActualArrivalPresent(LocalDateTime actualArrival) {
+        if (actualArrival == null) {
+            throw new BadRequestException(
+                    "Для перевода в статус ARRIVED необходимо фактическое время прилёта (actualArrival)");
+        }
+    }
+
+    private static void touchGateAssignments(Flight flight) {
+        if (flight.getGateAssignments() != null) {
+            flight.getGateAssignments().size();
+        }
+    }
+
+    private static String normalize(String code) {
+        return code == null ? "" : code.trim().toUpperCase();
+    }
+}

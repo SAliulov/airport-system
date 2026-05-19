@@ -1,8 +1,10 @@
 package ru.airport.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import ru.airport.model.Gate;
 import ru.airport.model.SizeCategory;
 
@@ -16,6 +18,10 @@ import java.util.Optional;
 public interface GateRepository extends JpaRepository<Gate, Integer> {
 
     Optional<Gate> findByGateNumber(String gateNumber);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT g FROM Gate g WHERE g.gateId = :id")
+    Optional<Gate> findByIdForUpdate(@Param("id") Integer id);
 
     boolean existsByGateNumber(String gateNumber);
 
