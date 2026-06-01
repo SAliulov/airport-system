@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import ru.airport.model.FlightStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +25,9 @@ public class FlightRs {
 
     private Integer flightId;
     private FlightStatus status;
+    private LocalDate operationDate;
+    private LocalDateTime scheduledDeparture;
+    private LocalDateTime scheduledArrival;
     private LocalDateTime actualDeparture;
     private LocalDateTime actualArrival;
     private ScheduleRs schedule;

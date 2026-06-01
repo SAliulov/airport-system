@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchAirlines, fetchFlights } from './api';
-import { FilterBar } from './components/FilterBar';
+import { FilterBar, type DatePreset } from './components/FilterBar';
 import { FlightTable } from './components/FlightTable';
 import { useStomp } from './hooks/useStomp';
-import type { AirlineRs, FlightRs } from './types';
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
+import type { AirlineRs, FlightRs, GateAssignmentPush } from './types';
+import { brandingLogoUrl } from './utils/branding';
+import { isWithinDaysFromToday, scheduleDepartureDate, todayAirportDate } from './utils/airportTime';
 
 function useClock() {
   const [time, setTime] = useState(() => new Date());
@@ -17,17 +16,23 @@ function useClock() {
   return time;
 }
 
+function applyDatePreset(preset: DatePreset): string {
+  if (preset === 'today') return todayAirportDate();
+  return '';
+}
+
 export default function App() {
   const [flights, setFlights] = useState<FlightRs[]>([]);
   const [airlines, setAirlines] = useState<AirlineRs[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [date, setDate] = useState(todayIso());
-  const [direction, setDirection] = useState('');
+  const [datePreset, setDatePreset] = useState<DatePreset>('today');
+  const [date, setDate] = useState(todayAirportDate());
+  const [origin, setOrigin] = useState('');
+  const [destination, setDestination] = useState('');
   const [airlineId, setAirlineId] = useState('');
 
-  // ids рейсов, получивших push последние 8 секунд
   const [highlightIds, setHighlightIds] = useState<Set<number>>(new Set());
   const highlightTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -39,9 +44,11 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
+      const apiDate = datePreset === 'today' ? date || todayAirportDate() : undefined;
       const data = await fetchFlights({
-        date: date || undefined,
-        direction: direction.length === 3 ? direction : undefined,
+        date: apiDate,
+        origin: origin.length === 3 ? origin : undefined,
+        destination: destination.length === 3 ? destination : undefined,
         airline: airlineId ? Number(airlineId) : undefined,
       });
       setFlights(data);
@@ -50,13 +57,23 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [date, direction, airlineId]);
+  }, [airlineId, date, datePreset, destination, origin]);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     fetchAirlines().then(setAirlines).catch(() => {});
   }, []);
+
+  const displayedFlights = useMemo(() => {
+    if (datePreset !== '7d' && datePreset !== '30d') return flights;
+    const days = datePreset === '7d' ? 7 : 30;
+    const today = todayAirportDate();
+    return flights.filter(f => {
+      const depDay = scheduleDepartureDate(f.scheduledDeparture) ?? f.operationDate;
+      return depDay != null && isWithinDaysFromToday(depDay, days, today);
+    });
+  }, [datePreset, flights]);
 
   function highlight(flightId: number) {
     setHighlightIds(prev => new Set(prev).add(flightId));
@@ -69,20 +86,40 @@ export default function App() {
     highlightTimers.current.set(flightId, timer);
   }
 
-  const handleMessage = useCallback((body: string) => {
+  const handleMessage = useCallback((body: string, topic: string) => {
     try {
-      const msg = JSON.parse(body) as { flightId?: number; status?: string };
-      if (!msg.flightId) return;
-      highlight(msg.flightId);
-      // Обновить статус в текущем списке без перезагрузки
-      if (msg.status) {
+      const msg = JSON.parse(body);
+      if (topic === '/topic/flights') {
+        const flight = msg as FlightRs;
+        if (!flight.flightId) return;
+        highlight(flight.flightId);
         setFlights(prev =>
           prev.map(f =>
-            f.flightId === msg.flightId
-              ? { ...f, status: msg.status as FlightRs['status'] }
+            f.flightId === flight.flightId
+              ? {
+                  ...f,
+                  status: flight.status ?? f.status,
+                  actualDeparture: flight.actualDeparture ?? f.actualDeparture,
+                  actualArrival: flight.actualArrival ?? f.actualArrival,
+                }
               : f,
           ),
         );
+      } else if (topic === '/topic/gate-changes') {
+        const push = msg as GateAssignmentPush;
+        if (!push.flightId) return;
+        highlight(push.flightId);
+        setFlights(prev =>
+          prev.map(f =>
+            f.flightId === push.flightId
+              ? { ...f, currentGateAssignment: push.assignment }
+              : f,
+          ),
+        );
+      } else if (topic === '/topic/delays') {
+        const push = msg as { flightId?: number };
+        if (!push.flightId) return;
+        highlight(push.flightId);
       }
     } catch {
       // ignore malformed
@@ -91,18 +128,17 @@ export default function App() {
 
   useStomp(['/topic/flights', '/topic/delays', '/topic/gate-changes'], handleMessage);
 
-  function handleFilterChange(field: 'date' | 'direction' | 'airlineId', value: string) {
-    if (field === 'date') setDate(value);
-    else if (field === 'direction') setDirection(value);
-    else setAirlineId(value);
+  function handleDatePresetChange(preset: DatePreset) {
+    setDatePreset(preset);
+    setDate(applyDatePreset(preset));
   }
 
   return (
     <div className="board">
       <header className="board-header">
         <div className="board-title">
-          <span className="board-icon">✈</span>
-          Информационное табло
+          <img src={brandingLogoUrl()} alt="АСУРР" className="board-logo" />
+          Табло аэропорта Шереметьево (SVO)
         </div>
         <div className="board-clock">
           {now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -111,17 +147,23 @@ export default function App() {
 
       <FilterBar
         date={date}
-        direction={direction}
+        datePreset={datePreset}
+        origin={origin}
+        destination={destination}
         airlineId={airlineId}
         airlines={airlines}
-        onChange={handleFilterChange}
+        onDatePresetChange={handleDatePresetChange}
+        onDateChange={setDate}
+        onOriginChange={setOrigin}
+        onDestinationChange={setDestination}
+        onAirlineChange={setAirlineId}
       />
 
       <main className="board-main">
         {loading && <p className="board-loading">Загрузка…</p>}
         {error && <p className="board-error">{error}</p>}
         {!loading && !error && (
-          <FlightTable flights={flights} highlightIds={highlightIds} />
+          <FlightTable flights={displayedFlights} highlightIds={highlightIds} />
         )}
       </main>
     </div>

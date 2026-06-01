@@ -1,14 +1,18 @@
 package ru.airport.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.ScheduleBusinessRules;
+import ru.airport.business.SchedulePeriodicityBusinessRules;
+import ru.airport.business.ScheduleSlotBusinessRules;
+import ru.airport.config.AirportClock;
+import ru.airport.config.AirportProperties;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
+import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Airline;
@@ -21,14 +25,17 @@ import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.ScheduleRepository;
 import ru.airport.validation.FlightStatusParser;
 import ru.airport.validation.TextNormalization;
+import ru.airport.websocket.RealtimeNotificationService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,24 +47,24 @@ public class ScheduleService {
     private final AirlineRepository airlineRepository;
     private final DtoMapper mapper;
     private final ScheduleBusinessRules scheduleBusinessRules;
+    private final ScheduleSlotBusinessRules scheduleSlotBusinessRules;
+    private final SchedulePeriodicityBusinessRules periodicityRules;
+    private final AirportProperties airportProperties;
+    private final AirportClock airportClock;
+    private final RealtimeNotificationService realtimeNotificationService;
 
-    @Value("${airport.home-iata}")
-    private String homeIata;
+    private static final DateTimeFormatter DEP_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
-    /**
-     * Все расписания без фильтров (GET /schedules).
-     */
+    private String homeIata() {
+        return airportProperties.getHomeIata();
+    }
+
     public List<ScheduleRs> listAll() {
-        return scheduleRepository.findAll(Sort.by(Sort.Order.asc("scheduledDeparture"))).stream()
+        return scheduleRepository.findAll(Sort.by(Sort.Order.asc("flightNumber"))).stream()
                 .map(mapper::toScheduleRs)
                 .toList();
     }
 
-    /**
-     * Фильтрация по дате, авиакомпании, статусу рейса, направлению (GET /schedules/filter).
-     *
-     * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
-     */
     public List<ScheduleRs> filter(
             LocalDate date,
             Integer airlineId,
@@ -69,12 +76,6 @@ public class ScheduleService {
         return findSchedules(date, airlineId, statusRaw, null, direction, origin, destination);
     }
 
-    /**
-     * Поиск по подстроке номера рейса с опциональными фильтрами (GET /schedules/search).
-     *
-     * @param query     подстрока для поиска в номере рейса (обязательно)
-     * @param statusRaw значение query {@code status} (имя enum), парсится здесь.
-     */
     public List<ScheduleRs> search(
             String query,
             LocalDate date,
@@ -108,8 +109,8 @@ public class ScheduleService {
                 .filter(s -> originIata == null || originIata.equals(trimUpper(s.getOriginAirport())))
                 .filter(s -> destinationIata == null || destinationIata.equals(trimUpper(s.getDestinationAirport())))
                 .filter(s -> dir == null || originIata != null || destinationIata != null || matchesDirection(s, dir))
-                .sorted(Comparator.comparing(Schedule::getScheduledDeparture))
-                .map(mapper::toScheduleRs)
+                .sorted(Comparator.comparing(Schedule::getFlightNumber))
+                .map(s -> mapper.toScheduleRs(s, date))
                 .toList();
     }
 
@@ -132,23 +133,25 @@ public class ScheduleService {
 
     private List<Schedule> resolveCandidates(LocalDate date, FlightStatus status) {
         if (date != null) {
-            LocalDateTime start = date.atStartOfDay();
-            LocalDateTime end = date.plusDays(1).atStartOfDay();
+            LocalDateTime start = airportClock.startOfDay(date);
+            LocalDateTime end = airportClock.startOfNextDay(date);
             if (status != null) {
                 List<Flight> flights = flightRepository.findAll(
                         FlightSpecifications.forApiList(start, end, status, null, null));
                 return distinctSchedules(flights.stream().map(Flight::getSchedule).toList());
             }
-            return scheduleRepository.findByDay(start, end);
+            return scheduleRepository.findAllActiveWithSlots().stream()
+                    .filter(s -> s.getSlots() != null && s.getSlots().stream()
+                            .anyMatch(slot -> periodicityRules.matchesOperationDate(s, slot, date)))
+                    .toList();
         }
         if (status != null) {
             List<Flight> flights = flightRepository.findByStatus(status);
-            List<Schedule> list = flights.stream().map(Flight::getSchedule).toList();
-            return distinctSchedules(list).stream()
-                    .sorted(Comparator.comparing(Schedule::getScheduledDeparture))
+            return distinctSchedules(flights.stream().map(Flight::getSchedule).toList()).stream()
+                    .sorted(Comparator.comparing(Schedule::getFlightNumber))
                     .toList();
         }
-        return scheduleRepository.findAll(Sort.by(Sort.Order.asc("scheduledDeparture")));
+        return scheduleRepository.findAll(Sort.by(Sort.Order.asc("flightNumber")));
     }
 
     private static List<Schedule> distinctSchedules(List<Schedule> schedules) {
@@ -166,10 +169,13 @@ public class ScheduleService {
     @Transactional
     public ScheduleRs create(ScheduleRq rq) {
         TextNormalization.normalizeScheduleAirports(rq);
+        scheduleBusinessRules.assertValidEffectiveRange(rq.getEffectiveFrom(), rq.getEffectiveTo());
+        scheduleBusinessRules.assertValidPeriodicity(rq.getPeriodicityType(), rq.getPeriodicityStep());
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
         Schedule draft = mapper.newSchedule(rq, airline);
-        FlightHomeAirportRules.assertScheduleIncludesHome(draft, homeIata);
+        scheduleSlotBusinessRules.assertValidSlots(draft, rq.getSlots());
+        FlightHomeAirportRules.assertValidHomeRoute(draft, homeIata());
         Schedule saved = scheduleRepository.save(draft);
         return mapper.toScheduleRs(saved);
     }
@@ -177,23 +183,49 @@ public class ScheduleService {
     @Transactional
     public ScheduleRs update(Integer id, ScheduleRq rq) {
         TextNormalization.normalizeScheduleAirports(rq);
-        Schedule s = loadSchedule(id);
+        Schedule existing = loadSchedule(id);
+        List<Flight> linkedFlights = flightRepository.findBySchedule_ScheduleId(id);
+        scheduleBusinessRules.assertMayUpdate(existing, rq, linkedFlights);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
-        mapper.apply(rq, s, airline);
-        FlightHomeAirportRules.assertScheduleIncludesHome(s, homeIata);
-        return mapper.toScheduleRs(scheduleRepository.save(s));
+        mapper.applyFields(rq, existing, airline);
+        mapper.mergeSlots(rq.getSlots(), existing, flightRepository::existsBySlot_SlotId);
+        scheduleSlotBusinessRules.assertValidSlots(existing, rq.getSlots());
+        FlightHomeAirportRules.assertValidHomeRoute(existing, homeIata());
+        Schedule saved = scheduleRepository.save(existing);
+        publishLinkedFlights(linkedFlights);
+        return mapper.toScheduleRs(saved);
     }
 
     @Transactional
     public void delete(Integer id) {
-        loadSchedule(id);
-        scheduleBusinessRules.assertMayDelete(flightRepository.existsBySchedule_ScheduleId(id));
+        Schedule schedule = loadSchedule(id);
+        List<Flight> linked = flightRepository.findBySchedule_ScheduleId(id);
+        if (!linked.isEmpty()) {
+            String details = linked.stream()
+                    .map(f -> "#%d %s, вылет %s".formatted(
+                            f.getFlightId(),
+                            f.getStatus(),
+                            f.getScheduledDeparture().format(DEP_FMT)))
+                    .collect(Collectors.joining("; "));
+            throw new ConflictException(
+                    "Нельзя удалить расписание %s: связано рейсов — %d (%s)"
+                            .formatted(schedule.getFlightNumber(), linked.size(), details));
+        }
+        scheduleBusinessRules.assertMayDelete(false);
         scheduleRepository.deleteById(id);
     }
 
+    private void publishLinkedFlights(List<Flight> linkedFlights) {
+        for (Flight linked : linkedFlights) {
+            Flight fresh = flightRepository.findById(linked.getFlightId()).orElseThrow();
+            realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(fresh));
+        }
+    }
+
     private Schedule loadSchedule(Integer id) {
-        return scheduleRepository.findById(id)
+        return scheduleRepository.findByIdWithSlots(id).stream()
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", id));
     }
 }

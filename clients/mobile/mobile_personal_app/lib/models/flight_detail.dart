@@ -57,8 +57,12 @@ class FlightDetail {
       originAirport: (schedule['originAirport']?.toString() ?? '').trim(),
       destinationAirport:
           (schedule['destinationAirport']?.toString() ?? '').trim(),
-      scheduledDeparture: schedule['scheduledDeparture']?.toString() ?? '',
-      scheduledArrival: schedule['scheduledArrival']?.toString() ?? '',
+      scheduledDeparture: json['scheduledDeparture']?.toString()
+          ?? schedule['scheduledDeparture']?.toString()
+          ?? '',
+      scheduledArrival: json['scheduledArrival']?.toString()
+          ?? schedule['scheduledArrival']?.toString()
+          ?? '',
       airlineName: airline?['name']?.toString(),
       aircraftIcao: aircraft?['icaoCode']?.toString(),
       currentGateAssignment:

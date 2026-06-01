@@ -17,8 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.airport.dto.AircraftTypeRs;
 import ru.airport.dto.DelayWarningRq;
 import ru.airport.dto.DelayWarningRs;
+import ru.airport.dto.FlightActualTimesRq;
 import ru.airport.dto.FlightAircraftAssignmentRq;
 import ru.airport.dto.GateRs;
+import ru.airport.dto.FlightGenerateRq;
+import ru.airport.dto.FlightGenerateRs;
 import ru.airport.dto.FlightRq;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.FlightStatusUpdateRq;
@@ -73,6 +76,12 @@ public class FlightController {
         return flightService.getById(id);
     }
 
+    @PostMapping("/generate")
+    @ResponseStatus(HttpStatus.CREATED)
+    public FlightGenerateRs generate(@RequestBody @Valid FlightGenerateRq rq) {
+        return flightService.generate(rq);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public FlightRs create(@RequestBody @Valid FlightRq rq) {
@@ -93,6 +102,11 @@ public class FlightController {
     @PutMapping("/{id}/status")
     public FlightRs updateStatus(@PathVariable("id") Integer id, @RequestBody @Valid FlightStatusUpdateRq rq) {
         return flightService.updateStatus(id, rq);
+    }
+
+    @PutMapping("/{id}/actual-times")
+    public FlightRs correctActualTimes(@PathVariable("id") Integer id, @RequestBody FlightActualTimesRq rq) {
+        return flightService.correctActualTimes(id, rq);
     }
 
     @PutMapping("/{id}/aircraft")

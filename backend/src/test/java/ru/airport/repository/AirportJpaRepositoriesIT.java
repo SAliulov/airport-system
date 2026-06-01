@@ -17,6 +17,7 @@ import ru.airport.model.Gate;
 import ru.airport.model.Schedule;
 import ru.airport.model.SizeCategory;
 import ru.airport.testsupport.DockerConditions;
+import ru.airport.testsupport.ScheduleTestFixtures;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,10 +53,6 @@ class AirportJpaRepositoriesIT {
     @Autowired
     private ScheduleRepository scheduleRepository;
 
-    /**
-     * Регрессия: при STRING-enum нельзя сравнивать max_size_category как строку &gt;= —
-     * иначе JUMBO &lt; NARROW лексикографически и гейт B2 выпадает для NARROW ВС.
-     */
     @Test
     void findActiveGatesCompatibleWithAircraftSize_matchesSizeCategorySemantics() {
         assertThat(gateRepository.findActiveGatesCompatibleWithAircraftSize(SizeCategory.NARROW))
@@ -75,28 +72,18 @@ class AirportJpaRepositoriesIT {
     @Test
     void findForAutoStatusProcessing_loadsScheduleForActiveStatuses() {
         Airline su = airlineRepository.findByIataCode("SU").orElseThrow();
-        Schedule schedule = scheduleRepository.save(Schedule.builder()
-                .flightNumber("SU999")
-                .originAirport("SVO")
-                .destinationAirport("LED")
-                .scheduledDeparture(LocalDateTime.of(2026, 3, 29, 10, 0))
-                .scheduledArrival(LocalDateTime.of(2026, 3, 29, 11, 0))
-                .airline(su)
-                .build());
+        LocalDateTime dep = LocalDateTime.of(2026, 3, 29, 10, 0);
+        LocalDateTime arr = LocalDateTime.of(2026, 3, 29, 11, 0);
+        var saved = ScheduleTestFixtures.saveWeeklySchedule(
+                scheduleRepository, su, "SU999", "SVO", "LED", dep, arr);
 
-        Flight scheduled = flightRepository.save(Flight.builder()
-                .schedule(schedule)
-                .status(FlightStatus.SCHEDULED)
-                .build());
-        Flight departed = flightRepository.save(Flight.builder()
-                .schedule(schedule)
-                .status(FlightStatus.DEPARTED)
-                .actualDeparture(LocalDateTime.of(2026, 3, 29, 10, 5))
-                .build());
-        Flight arrived = flightRepository.save(Flight.builder()
-                .schedule(schedule)
-                .status(FlightStatus.ARRIVED)
-                .build());
+        Flight scheduled = ScheduleTestFixtures.saveFlight(
+                flightRepository, saved, FlightStatus.SCHEDULED);
+        Flight departed = ScheduleTestFixtures.saveFlight(
+                flightRepository, saved, LocalDate.of(2026, 4, 5), FlightStatus.DEPARTED,
+                LocalDateTime.of(2026, 4, 5, 10, 5), null);
+        Flight arrived = ScheduleTestFixtures.saveFlight(
+                flightRepository, saved, LocalDate.of(2026, 4, 12), FlightStatus.ARRIVED, null, null);
 
         assertThat(flightRepository.findForAutoStatusProcessing(
                 EnumSet.of(FlightStatus.SCHEDULED, FlightStatus.DELAYED, FlightStatus.DEPARTED)))
@@ -111,18 +98,9 @@ class AirportJpaRepositoriesIT {
         LocalDate day = LocalDate.of(2026, 7, 15);
         LocalDateTime dep = day.atTime(8, 0);
         LocalDateTime arr = day.atTime(10, 0);
-        Schedule schedule = scheduleRepository.save(Schedule.builder()
-                .flightNumber("SU700")
-                .originAirport("SVO")
-                .destinationAirport("LED")
-                .scheduledDeparture(dep)
-                .scheduledArrival(arr)
-                .airline(su)
-                .build());
-        Flight flight = flightRepository.save(Flight.builder()
-                .schedule(schedule)
-                .status(FlightStatus.SCHEDULED)
-                .build());
+        var saved = ScheduleTestFixtures.saveWeeklySchedule(
+                scheduleRepository, su, "SU700", "SVO", "LED", dep, arr);
+        Flight flight = ScheduleTestFixtures.saveFlight(flightRepository, saved, FlightStatus.SCHEDULED);
 
         LocalDateTime start = day.atStartOfDay();
         LocalDateTime end = day.plusDays(1).atStartOfDay();
@@ -142,5 +120,18 @@ class AirportJpaRepositoriesIT {
         assertThat(flightRepository.findAll(FlightSpecifications.forApiList(null, null, FlightStatus.SCHEDULED, null, null)))
                 .extracting(Flight::getFlightId)
                 .contains(flight.getFlightId());
+    }
+
+    @Test
+    void existsBySlotAndOperationDate_enforcesOneInstancePerSlotAndDate() {
+        Airline su = airlineRepository.findByIataCode("SU").orElseThrow();
+        LocalDate day = LocalDate.of(2026, 8, 1);
+        var saved = ScheduleTestFixtures.saveWeeklySchedule(
+                scheduleRepository, su, "SU800", "SVO", "LED",
+                day.atTime(9, 0), day.atTime(11, 0));
+        ScheduleTestFixtures.saveFlight(flightRepository, saved, FlightStatus.SCHEDULED);
+
+        assertThat(flightRepository.existsBySlot_SlotIdAndOperationDate(saved.slot().getSlotId(), day))
+                .isTrue();
     }
 }

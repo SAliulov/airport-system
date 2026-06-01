@@ -1,99 +1,159 @@
-import { useEffect, useState } from 'react';
-import { exportUrl, getTimeline } from '../services/api';
-import { getToken } from '../services/auth';
-import type { GateTimelineSegmentRs } from '../types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import PageStatus from '../components/PageStatus';
+import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
+import { getGates, getTimeline } from '../services/api';
+import type { GateRs, GateTimelineSegmentRs } from '../types';
+import { formatApiError } from '../utils/apiError';
+import { todayAirportDate } from '../utils/airportTime';
 
-function apiErr(e: unknown) { return e instanceof Error ? e.message : String(e); }
+interface ClippedSegment extends GateTimelineSegmentRs {
+  clipFrom: string;
+  clipTo: string;
+}
 
-function todayIso() { return new Date().toISOString().slice(0, 10); }
+function parseWallMs(iso: string): number {
+  const normalized = iso.includes('T') ? iso : iso.replace(' ', 'T');
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
 
-const COLORS = [
-  '#3b82f6', '#f97316', '#22c55e', '#a855f7',
-  '#06b6d4', '#ec4899', '#facc15', '#84cc16',
-];
+function segKey(s: GateTimelineSegmentRs) {
+  return `${s.flightId}-${s.assignedFrom}`;
+}
+
+function clipToDay(
+  segs: GateTimelineSegmentRs[],
+  dayStartMs: number,
+  dayEndMs: number,
+): ClippedSegment[] {
+  const clipped: ClippedSegment[] = [];
+  for (const s of segs) {
+    const fromMs = parseWallMs(s.assignedFrom);
+    const toMs = parseWallMs(s.assignedTo);
+    const clipStart = Math.max(fromMs, dayStartMs);
+    const clipEnd = Math.min(toMs, dayEndMs);
+    if (clipStart >= clipEnd) continue;
+    clipped.push({
+      ...s,
+      clipFrom: new Date(clipStart).toISOString(),
+      clipTo: new Date(clipEnd).toISOString(),
+    });
+  }
+  return clipped;
+}
 
 export default function TimelinePage() {
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(todayAirportDate);
   const [segments, setSegments] = useState<GateTimelineSegmentRs[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [gates, setGates] = useState<GateRs[]>([]);
+  const [pageError, setPageError] = useState<string | null>(null);
 
-  const load = () =>
-    getTimeline(date)
-      .then(setSegments)
-      .catch(e => setError(apiErr(e)));
+  const dayStartMs = useMemo(
+    () => parseWallMs(`${date}T00:00:00`),
+    [date],
+  );
+  const dayEndMs = useMemo(
+    () => parseWallMs(`${date}T23:59:59.999`),
+    [date],
+  );
+  const span = dayEndMs - dayStartMs;
 
-  useEffect(() => { load(); }, [date]);
+  const load = useCallback(() => {
+    setPageError(null);
+    Promise.all([getTimeline(date), getGates()])
+      .then(([timeline, allGates]) => {
+        setSegments(timeline);
+        setGates(allGates.filter(g => g.isActive));
+      })
+      .catch(e => setPageError(formatApiError(e)));
+  }, [date]);
 
-  // Grouping by gate
-  const byGate = new Map<string, { label: string; segs: GateTimelineSegmentRs[] }>();
-  for (const s of segments) {
-    const key = String(s.gateId);
-    if (!byGate.has(key)) {
-      byGate.set(key, {
-        label: s.terminal ? `${s.gateNumber} (${s.terminal})` : s.gateNumber,
-        segs: [],
-      });
+  const waitingForServer = useRetryWhenBackendUp(pageError, setPageError, load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const byGate = useMemo(() => {
+    const map = new Map<string, { label: string; segs: GateTimelineSegmentRs[] }>();
+    for (const g of gates) {
+      const key = String(g.gateId);
+      const term = g.terminal ? ` (${g.terminal})` : '';
+      map.set(key, { label: `${g.gateNumber}${term}`, segs: [] });
     }
-    byGate.get(key)!.segs.push(s);
-  }
-
-  // Find visible window [dayStart, dayEnd]
-  const dayStart = new Date(`${date}T00:00:00`).getTime();
-  const dayEnd = new Date(`${date}T23:59:59`).getTime();
-  const span = dayEnd - dayStart;
+    for (const s of segments) {
+      const key = String(s.gateId);
+      if (!map.has(key)) {
+        map.set(key, {
+          label: s.terminal ? `${s.gateNumber} (${s.terminal})` : s.gateNumber,
+          segs: [],
+        });
+      }
+      map.get(key)!.segs.push(s);
+    }
+    return map;
+  }, [gates, segments]);
 
   function pct(iso: string) {
-    const t = new Date(iso).getTime();
-    return Math.max(0, Math.min(100, ((t - dayStart) / span) * 100));
+    const t = parseWallMs(iso);
+    return Math.max(0, Math.min(100, ((t - dayStartMs) / span) * 100));
   }
+
   function width(from: string, to: string) {
-    const a = new Date(from).getTime();
-    const b = new Date(to).getTime();
+    const a = parseWallMs(from);
+    const b = parseWallMs(to);
     return Math.max(0.5, ((b - a) / span) * 100);
   }
 
-  async function downloadExport(format: 'pdf' | 'excel') {
-    const token = getToken();
-    const url = exportUrl(format, date);
-    try {
-      const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) { setError(`Экспорт: HTTP ${res.status}`); return; }
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `schedule_${date}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
-      a.click();
-    } catch (e: unknown) { setError(apiErr(e)); }
+  const STATUS_COLORS: Record<string, string> = {
+    SCHEDULED: '#3b82f6',
+    DEPARTED: '#f97316',
+    ARRIVED: '#22c55e',
+    DELAYED: '#ef4444',
+    CANCELLED: '#6b7280',
+  };
+
+  function segColor(s: ClippedSegment): string {
+    const st = s.flightStatus;
+    return st ? (STATUS_COLORS[st] ?? '#3b82f6') : '#3b82f6';
   }
 
-  const flightColors = new Map<number, string>();
-  let colorIdx = 0;
-  for (const s of segments) {
-    if (!flightColors.has(s.flightId)) {
-      flightColors.set(s.flightId, COLORS[colorIdx % COLORS.length]);
-      colorIdx++;
-    }
-  }
+  const gateRows = [...byGate.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
 
   return (
     <div className="page">
       <div className="timeline-toolbar">
         <h1>Таймлайн гейтов</h1>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} />
-        <button className="btn-ghost btn-sm" onClick={load}>Обновить</button>
-        <button className="btn-primary btn-sm" onClick={() => downloadExport('pdf')}>
-          ⬇ PDF
-        </button>
-        <button className="btn-primary btn-sm" onClick={() => downloadExport('excel')}>
-          ⬇ Excel
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setDate(todayAirportDate())}>
+          Сегодня
         </button>
       </div>
 
-      {error && <p className="page-error">{error}</p>}
+      <PageStatus error={pageError} waitingForServer={waitingForServer} />
 
-      {/* Hour ticks */}
+      <div className="tl-legend">
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#1e293b', border: '1px solid #334155' }} />
+          Свободен
+        </span>
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#3b82f6' }} /> SCHEDULED
+        </span>
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#f97316' }} /> DEPARTED
+        </span>
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#22c55e' }} /> ARRIVED
+        </span>
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#ef4444' }} /> DELAYED
+        </span>
+        <span className="tl-legend-item">
+          <span className="tl-legend-dot" style={{ background: '#6b7280' }} /> CANCELLED
+        </span>
+      </div>
+
       <div className="tl-hour-row">
         {Array.from({ length: 25 }, (_, i) => (
           <span key={i} style={{ left: `${(i / 24) * 100}%` }}>
@@ -103,28 +163,31 @@ export default function TimelinePage() {
       </div>
 
       <div className="tl-container">
-        {byGate.size === 0 && <p className="muted">Нет данных за выбранную дату</p>}
-        {[...byGate.entries()].map(([key, { label, segs }]) => (
-          <div key={key} className="tl-row">
-            <div className="tl-gate-label">{label}</div>
-            <div className="tl-bar-area">
-              {segs.map(s => (
-                <div
-                  key={s.flightId + s.assignedFrom}
-                  className="tl-segment"
-                  style={{
-                    left: `${pct(s.assignedFrom)}%`,
-                    width: `${width(s.assignedFrom, s.assignedTo)}%`,
-                    background: flightColors.get(s.flightId) ?? '#3b82f6',
-                  }}
-                  title={`${s.flightNumber}\n${s.assignedFrom.slice(11, 16)} – ${s.assignedTo.slice(11, 16)}`}
-                >
-                  <span className="tl-label">{s.flightNumber}</span>
-                </div>
-              ))}
+        {gateRows.length === 0 && <p className="muted">Нет активных гейтов</p>}
+        {gateRows.map(([key, { label, segs }]) => {
+          const clipped = clipToDay(segs, dayStartMs, dayEndMs);
+          return (
+            <div key={key} className="tl-row">
+              <div className="tl-gate-label">{label}</div>
+              <div className="tl-bar-area">
+                {clipped.map(s => (
+                  <div
+                    key={segKey(s)}
+                    className="tl-segment"
+                    style={{
+                      left: `${pct(s.clipFrom)}%`,
+                      width: `${width(s.clipFrom, s.clipTo)}%`,
+                      background: segColor(s),
+                    }}
+                    title={`${s.flightNumber}${s.flightStatus ? ` (${s.flightStatus})` : ''}\n${s.assignedFrom.slice(11, 16)} – ${s.assignedTo.slice(11, 16)}`}
+                  >
+                    <span className="tl-label">{s.flightNumber}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

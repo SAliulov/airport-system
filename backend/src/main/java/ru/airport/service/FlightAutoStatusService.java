@@ -24,6 +24,8 @@ public class FlightAutoStatusService {
             "[AUTO] Превышено плановое время ожидания вылета (диспетчер не перевёл рейс в DEPARTED)";
     public static final String AUTO_INBOUND_GATE_DELAY_REASON =
             "[AUTO] Не назначен гейт к плановому прилёту в базовый аэропорт";
+    public static final String AUTO_INBOUND_MISSED_DEPARTURE_REASON =
+            "[AUTO] Не назначен тип ВС к плановому вылету из аэропорта отправления";
     public static final String AUTO_CANCEL_REASON =
             "[AUTO] Рейс не выполнен к плановому вылету";
 

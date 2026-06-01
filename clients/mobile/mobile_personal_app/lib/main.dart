@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'config.dart';
+import 'core/theme/app_theme.dart';
 import 'services/auth_service.dart';
 import 'services/airport_api.dart';
 import 'services/stomp_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/flight_lookup_screen.dart';
+import 'screens/home_shell.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const AirportApp());
 }
 
@@ -20,6 +23,12 @@ class _AirportAppState extends State<AirportApp> {
   final _auth = AuthService();
   late final _api = AirportApi(_auth);
   final _stomp = StompService();
+
+  @override
+  void initState() {
+    super.initState();
+    AppConfig.ensureLoaded();
+  }
 
   @override
   void dispose() {
@@ -38,15 +47,11 @@ class _AirportAppState extends State<AirportApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Airport Ground Staff',
+      title: 'АСУРР',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.light,
-      ),
+      theme: buildAppTheme(),
       home: _auth.isLoggedIn
-          ? FlightLookupScreen(
+          ? HomeShell(
               api: _api,
               stomp: _stomp,
               onLogout: _onLogout,

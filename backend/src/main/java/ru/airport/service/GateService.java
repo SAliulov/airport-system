@@ -5,6 +5,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.airport.business.GateBusinessRules;
+import ru.airport.config.AirportClock;
 import ru.airport.dto.GateRq;
 import ru.airport.dto.GateRs;
 import ru.airport.dto.GateTimelineSegmentRs;
@@ -28,6 +29,7 @@ public class GateService {
     private final GateAssignmentRepository gateAssignmentRepository;
     private final DtoMapper mapper;
     private final GateBusinessRules gateBusinessRules;
+    private final AirportClock airportClock;
 
     public List<GateRs> findAll() {
         return gateRepository.findAll(Sort.by("gateNumber")).stream()
@@ -77,8 +79,8 @@ public class GateService {
      * Интервалы занятости гейтов за календарные сутки (задача 7).
      */
     public List<GateTimelineSegmentRs> getTimelineForDay(LocalDate date) {
-        LocalDateTime dayStart = date.atStartOfDay();
-        LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
+        LocalDateTime dayStart = airportClock.startOfDay(date);
+        LocalDateTime dayEnd = airportClock.startOfNextDay(date);
         return gateAssignmentRepository.findByDay(dayStart, dayEnd).stream()
                 .map(mapper::toTimelineSegment)
                 .toList();

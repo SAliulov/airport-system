@@ -16,21 +16,26 @@ export function clearToken() {
   localStorage.removeItem(KEY);
 }
 
+export function clearSession() {
+  clearToken();
+  localStorage.removeItem('airport_user');
+}
+
 export async function login(username: string, password: string): Promise<LoginRs> {
-  const res = await axios.post<LoginRs>(`${API_BASE}/api/v1/auth/login`, { username, password });
+  const res = await axios.post<LoginRs>(`${API_BASE}/api/v1/auth/login`, {
+    username,
+    password,
+    client: 'DISPATCHER',
+  });
   return res.data;
 }
 
 export async function logout(token: string): Promise<void> {
-  try {
-    await axios.post(
-      `${API_BASE}/api/v1/auth/logout`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-  } finally {
-    clearToken();
-  }
+  await axios.post(
+    `${API_BASE}/api/v1/auth/logout`,
+    {},
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
 }
 
 export async function getProfile(token: string): Promise<UserProfileRs> {

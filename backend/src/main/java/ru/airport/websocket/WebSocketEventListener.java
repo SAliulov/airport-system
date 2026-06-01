@@ -8,6 +8,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import ru.airport.event.DelayWarningEvent;
 import ru.airport.event.FlightUpdateEvent;
 import ru.airport.event.GateChangeEvent;
+import ru.airport.event.OperationalEvent;
 import ru.airport.websocket.payload.DelayWarningPush;
 import ru.airport.websocket.payload.GateAssignmentPush;
 
@@ -36,5 +37,10 @@ public class WebSocketEventListener {
                 "/topic/delays",
                 new DelayWarningPush(event.flightId(), event.warningRs())
         );
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onOperationalEvent(OperationalEvent event) {
+        messagingTemplate.convertAndSend("/topic/operational-events", event.payload());
     }
 }

@@ -33,6 +33,12 @@ public class FlightActualTimeRules {
         }
     }
 
+    /** Валидация итоговых фактических времён после merge с текущими значениями рейса. */
+    public void assertCorrection(LocalDateTime actualDeparture, LocalDateTime actualArrival, LocalDateTime now) {
+        assertActualDeparture(actualDeparture, now);
+        assertActualArrival(actualArrival, actualDeparture, now);
+    }
+
     private void assertNotTooFarInFuture(LocalDateTime value, LocalDateTime now, String label) {
         if (now == null) {
             return;

@@ -4,14 +4,16 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,11 +23,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private static final Map<String, String> FIELD_LABELS = Map.ofEntries(
+            Map.entry("flightNumber", "Номер рейса"),
+            Map.entry("originAirport", "Аэропорт вылета"),
+            Map.entry("destinationAirport", "Аэропорт прилёта"),
+            Map.entry("scheduledDeparture", "Плановый вылет"),
+            Map.entry("scheduledArrival", "Плановый прилёт"),
+            Map.entry("airlineId", "Авиакомпания")
+    );
 
     private static ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of("error", message));
@@ -52,20 +64,25 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> dataIntegrity(DataIntegrityViolationException ex) {
+        log.debug("Data integrity violation: {}", ex.getMessage());
+        return error(HttpStatus.CONFLICT,
+                "Нельзя изменить данные: есть связанные записи (например, рейсы по слоту расписания)");
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> validation(MethodArgumentNotValidException ex) {
-        String msg = ex.getBindingResult().getFieldErrors().stream()
-                .map(GlobalExceptionHandler::formatFieldError)
-                .collect(Collectors.joining("; "));
-        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Validation failed" : msg);
+        String msg = collectBindingErrors(ex.getBindingResult().getFieldErrors(),
+                ex.getBindingResult().getGlobalErrors());
+        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Ошибка валидации данных" : msg);
     }
 
     @ExceptionHandler(BindException.class)
     public ResponseEntity<Map<String, String>> bindException(BindException ex) {
-        String msg = ex.getBindingResult().getFieldErrors().stream()
-                .map(GlobalExceptionHandler::formatFieldError)
-                .collect(Collectors.joining("; "));
-        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Validation failed" : msg);
+        String msg = collectBindingErrors(ex.getBindingResult().getFieldErrors(),
+                ex.getBindingResult().getGlobalErrors());
+        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Ошибка валидации данных" : msg);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -73,7 +90,7 @@ public class GlobalExceptionHandler {
         String msg = ex.getConstraintViolations().stream()
                 .map(ConstraintViolation::getMessage)
                 .collect(Collectors.joining("; "));
-        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Validation failed" : msg);
+        return error(HttpStatus.BAD_REQUEST, msg.isEmpty() ? "Ошибка валидации данных" : msg);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -144,7 +161,28 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Внутренняя ошибка сервера");
     }
 
+    private static String collectBindingErrors(
+            java.util.List<FieldError> fieldErrors,
+            java.util.List<ObjectError> globalErrors
+    ) {
+        return Stream.concat(
+                        fieldErrors.stream().map(GlobalExceptionHandler::formatFieldError),
+                        globalErrors.stream().map(GlobalExceptionHandler::formatObjectError))
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.joining("; "));
+    }
+
     private static String formatFieldError(FieldError fe) {
-        return fe.getField() + ": " + fe.getDefaultMessage();
+        String label = FIELD_LABELS.getOrDefault(fe.getField(), fe.getField());
+        String message = fe.getDefaultMessage();
+        return label + ": " + (message != null ? message : "некорректное значение");
+    }
+
+    private static String formatObjectError(ObjectError oe) {
+        String message = oe.getDefaultMessage();
+        if (message == null || message.isBlank()) {
+            return "";
+        }
+        return message;
     }
 }

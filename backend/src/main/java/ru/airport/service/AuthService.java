@@ -3,14 +3,17 @@ package ru.airport.service;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import ru.airport.dto.LoginClient;
 import ru.airport.dto.LoginRq;
 import ru.airport.dto.LoginRs;
 import ru.airport.dto.UserProfileRs;
+import ru.airport.model.UserRole;
 import ru.airport.exception.BadRequestException;
 import ru.airport.exception.ServerErrorException;
 import ru.airport.mapper.DtoMapper;
@@ -41,16 +44,18 @@ public class AuthService {
         if (!(principalObj instanceof UserDetails principal)) {
             throw new ServerErrorException("Unexpected principal type");
         }
+        UserRole expectedRole = rq.getClient() == LoginClient.DISPATCHER
+                ? UserRole.DISPATCHER
+                : UserRole.READ_ONLY;
+        UserRole actualRole = resolveUserRole(principal);
+        if (actualRole != expectedRole) {
+            throw new BadCredentialsException("Неверное имя пользователя или пароль");
+        }
         String token = jwtTokenUtil.generateToken(principal);
-        String role = principal.getAuthorities().stream()
-                .findFirst()
-                .map(GrantedAuthority::getAuthority)
-                .map(a -> a.replace("ROLE_", ""))
-                .orElse("");
         return LoginRs.builder()
                 .accessToken(token)
                 .tokenType("Bearer")
-                .role(role)
+                .role(actualRole.name())
                 .build();
     }
 
@@ -62,5 +67,18 @@ public class AuthService {
                 .orElseThrow(() -> new BadRequestException(
                         "Нужен заголовок Authorization: Bearer <accessToken>"));
         jwtTokenBlacklist.add(token);
+    }
+
+    private static UserRole resolveUserRole(UserDetails principal) {
+        String role = principal.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .map(a -> a.replace("ROLE_", ""))
+                .orElse("");
+        try {
+            return UserRole.valueOf(role);
+        } catch (IllegalArgumentException ex) {
+            throw new BadCredentialsException("Неверное имя пользователя или пароль");
+        }
     }
 }

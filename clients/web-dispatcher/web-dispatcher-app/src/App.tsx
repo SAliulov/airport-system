@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import { clearSession } from './services/auth';
+import { useAuth } from './context/useAuth';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import FlightsPage from './pages/FlightsPage';
@@ -10,10 +11,17 @@ import AircraftTypesPage from './pages/AircraftTypesPage';
 import GatesPage from './pages/GatesPage';
 import TimelinePage from './pages/TimelinePage';
 
+const DISPATCHER_ROLE = 'DISPATCHER';
+
 function RequireAuth({ children }: { children: React.ReactElement }) {
-  const { token } = useAuth();
+  const { token, role } = useAuth();
   const location = useLocation();
-  if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!token || role !== DISPATCHER_ROLE) {
+    if (token && role !== DISPATCHER_ROLE) {
+      clearSession();
+    }
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
   return children;
 }
 

@@ -1,5 +1,6 @@
 package ru.airport.aspect;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -9,28 +10,35 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import ru.airport.audit.OperationalEventMapper;
 import ru.airport.dto.DelayWarningRq;
-import ru.airport.scheduler.FlightStatusScheduler;
-import ru.airport.service.AuthService;
 import ru.airport.dto.FlightAircraftAssignmentRq;
 import ru.airport.dto.FlightStatusUpdateRq;
 import ru.airport.dto.GateAssignmentRq;
+import ru.airport.scheduler.FlightStatusScheduler;
+import ru.airport.service.AuthService;
+import ru.airport.websocket.RealtimeNotificationService;
 
 import java.util.StringJoiner;
 
 /**
  * Аудит вызовов прикладного слоя (FirstLab / AGENTS: сквозное логирование действий диспетчера).
- * GoF: можно трактовать как элемент цепочки обработки; GRASP: отдельная ответственность «аудит».
+ * Успешные мутации диспетчера дополнительно публикуются в {@code /topic/operational-events}.
  */
 @Aspect
 @Component
 @Order(0)
 @Slf4j
+@RequiredArgsConstructor
 public class ServiceAuditAspect {
+
+    private final OperationalEventMapper operationalEventMapper;
+    private final RealtimeNotificationService realtimeNotificationService;
 
     @Around("execution(* ru.airport.service..*(..)) || execution(* ru.airport.scheduler..*(..))")
     public Object auditService(ProceedingJoinPoint pjp) throws Throwable {
         String user = currentUser();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String sig = pjp.getSignature().toShortString();
         String details = extractDomainDetails(pjp);
         long t0 = System.currentTimeMillis();
@@ -46,6 +54,7 @@ public class ServiceAuditAspect {
                 log.info("AUDIT user={} {} OK in {} ms{}", user, sig, ms, details);
             } else if (isMutationLike(methodSig.getMethod().getName())) {
                 log.info("AUDIT user={} {} OK in {} ms{}", user, sig, ms, details);
+                publishOperationalEventIfApplicable(methodSig, pjp.getArgs(), result, user, authentication, details);
             } else if (log.isDebugEnabled()) {
                 log.debug("AUDIT user={} {} OK in {} ms{}", user, sig, ms, details);
             }
@@ -60,6 +69,17 @@ public class ServiceAuditAspect {
             }
             throw ex;
         }
+    }
+
+    private void publishOperationalEventIfApplicable(
+            MethodSignature methodSig,
+            Object[] args,
+            Object result,
+            String user,
+            Authentication authentication,
+            String details) {
+        operationalEventMapper.tryMap(methodSig, args, result, user, authentication, details)
+                .ifPresent(realtimeNotificationService::publishOperationalEvent);
     }
 
     private static String currentUser() {
@@ -94,14 +114,10 @@ public class ServiceAuditAspect {
                 || m.contains("delete")
                 || m.contains("assign")
                 || m.contains("add")
-                || m.contains("export")
-                || m.contains("save");
+                || m.contains("generate")
+                || m.contains("correct");
     }
 
-    /**
-     * Extracts domain-relevant identifiers (flightId, gateId, status, etc.)
-     * from method parameters for richer audit messages.
-     */
     private static String extractDomainDetails(ProceedingJoinPoint pjp) {
         Object[] args = pjp.getArgs();
         String[] paramNames = ((MethodSignature) pjp.getSignature()).getParameterNames();
@@ -113,7 +129,9 @@ public class ServiceAuditAspect {
 
         for (int i = 0; i < args.length; i++) {
             Object arg = args[i];
-            if (arg == null) continue;
+            if (arg == null) {
+                continue;
+            }
 
             String name = (paramNames != null && i < paramNames.length) ? paramNames[i] : null;
 

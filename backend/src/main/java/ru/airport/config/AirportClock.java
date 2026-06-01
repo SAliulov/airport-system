@@ -3,6 +3,7 @@ package ru.airport.config;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -42,5 +43,15 @@ public class AirportClock {
             return null;
         }
         return LocalDateTime.ofInstant(instant, zoneId);
+    }
+
+    /** Начало календарного дня аэропорта (наивное local, как в БД). */
+    public LocalDateTime startOfDay(LocalDate date) {
+        return date == null ? null : date.atStartOfDay();
+    }
+
+    /** Исключающая граница следующего дня для фильтра {@code [start, end)}. */
+    public LocalDateTime startOfNextDay(LocalDate date) {
+        return date == null ? null : date.plusDays(1).atStartOfDay();
     }
 }

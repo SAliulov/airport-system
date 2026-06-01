@@ -1,65 +1,81 @@
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
-import { clearToken, getToken, login as apiLogin, logout as apiLogout, setToken } from '../services/auth';
+  clearSession,
+  getProfile,
+  getToken,
+  login as apiLogin,
+  logout as apiLogout,
+  setToken,
+} from '../services/auth';
+import { AuthContext, readStoredUser, type AuthState } from './auth-context';
 
-interface AuthState {
-  token: string | null;
-  role: string | null;
-  username: string | null;
+function persistUser(username: string, role: string) {
+  localStorage.setItem('airport_user', JSON.stringify({ username, role }));
 }
-
-interface AuthCtx extends AuthState {
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => ({
-    token: getToken(),
-    role: null,
-    username: null,
-  }));
+  const [ready, setReady] = useState(() => !getToken());
+  const [state, setState] = useState<AuthState>(() => {
+    const stored = readStoredUser();
+    return {
+      token: getToken(),
+      role: stored?.role ?? null,
+      username: stored?.username ?? null,
+    };
+  });
 
-  // restore username/role from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem('airport_user');
-    if (stored) {
-      try {
-        const u = JSON.parse(stored) as { username: string; role: string };
-        setState(s => ({ ...s, username: u.username, role: u.role }));
-      } catch {
-        /* ignore */
-      }
+    const token = getToken();
+    if (!token) {
+      setReady(true);
+      return;
     }
+
+    let cancelled = false;
+    getProfile(token)
+      .then(profile => {
+        if (cancelled) return;
+        persistUser(profile.username, profile.role);
+        setState({ token, role: profile.role, username: profile.username });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearSession();
+        setState({ token: null, role: null, username: null });
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
     const rs = await apiLogin(username, password);
     setToken(rs.accessToken);
-    localStorage.setItem('airport_user', JSON.stringify({ username, role: rs.role }));
+    persistUser(username, rs.role);
     setState({ token: rs.accessToken, role: rs.role, username });
   }, []);
 
   const logout = useCallback(async () => {
-    if (state.token) await apiLogout(state.token);
-    clearToken();
-    localStorage.removeItem('airport_user');
-    setState({ token: null, role: null, username: null });
-  }, [state.token]);
+    const token = getToken();
+    try {
+      if (token) await apiLogout(token);
+    } finally {
+      clearSession();
+      setState({ token: null, role: null, username: null });
+    }
+  }, []);
 
-  return <Ctx.Provider value={{ ...state, login, logout }}>{children}</Ctx.Provider>;
-}
+  if (!ready) {
+    return null;
+  }
 
-export function useAuth() {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useAuth outside AuthProvider');
-  return ctx;
+  return (
+    <AuthContext.Provider value={{ ...state, ready, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

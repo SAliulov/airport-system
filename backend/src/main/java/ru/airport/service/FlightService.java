@@ -1,19 +1,24 @@
 package ru.airport.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.airport.config.AirportClock;
+import ru.airport.config.AirportProperties;
 import ru.airport.business.DelayWarningBusinessRules;
 import ru.airport.business.FlightActualTimeRules;
+import ru.airport.business.FlightGenerationBusinessRules;
 import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.FlightMutationBusinessRules;
 import ru.airport.business.FlightStatusBusinessRules;
 import ru.airport.business.GateAssignmentBusinessRules;
+import ru.airport.business.ScheduleOccurrenceBusinessRules;
 import ru.airport.dto.DelayWarningRq;
 import ru.airport.dto.DelayWarningRs;
+import ru.airport.dto.FlightActualTimesRq;
 import ru.airport.dto.FlightAircraftAssignmentRq;
+import ru.airport.dto.FlightGenerateRq;
+import ru.airport.dto.FlightGenerateRs;
 import ru.airport.dto.FlightRq;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.FlightStatusUpdateRq;
@@ -29,6 +34,7 @@ import ru.airport.dto.GateRs;
 import ru.airport.model.Gate;
 import ru.airport.model.GateAssignment;
 import ru.airport.model.Schedule;
+import ru.airport.model.ScheduleSlot;
 import ru.airport.model.SizeCategory;
 import ru.airport.repository.AircraftTypeRepository;
 import ru.airport.repository.DelayWarningRepository;
@@ -37,11 +43,13 @@ import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.GateAssignmentRepository;
 import ru.airport.repository.GateRepository;
 import ru.airport.repository.ScheduleRepository;
+import ru.airport.repository.ScheduleSlotRepository;
 import ru.airport.validation.FlightStatusParser;
 import ru.airport.websocket.RealtimeNotificationService;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -52,6 +60,7 @@ public class FlightService {
 
     private final FlightRepository flightRepository;
     private final ScheduleRepository scheduleRepository;
+    private final ScheduleSlotRepository scheduleSlotRepository;
     private final AircraftTypeRepository aircraftTypeRepository;
     private final GateRepository gateRepository;
     private final GateAssignmentRepository gateAssignmentRepository;
@@ -62,11 +71,15 @@ public class FlightService {
     private final FlightStatusBusinessRules flightStatusBusinessRules;
     private final FlightActualTimeRules flightActualTimeRules;
     private final DelayWarningBusinessRules delayWarningBusinessRules;
+    private final FlightGenerationBusinessRules flightGenerationBusinessRules;
+    private final ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules;
     private final RealtimeNotificationService realtimeNotificationService;
     private final AirportClock airportClock;
+    private final AirportProperties airportProperties;
 
-    @Value("${airport.home-iata}")
-    private String homeIata;
+    private String homeIata() {
+        return airportProperties.getHomeIata();
+    }
 
     public List<FlightRs> listAll() {
         return flightRepository.findAllForApiList().stream()
@@ -107,8 +120,8 @@ public class FlightService {
             String flightNumberQuery
     ) {
         FlightStatus status = FlightStatusParser.parseOptional(statusRaw);
-        LocalDateTime dayStart = date != null ? date.atStartOfDay() : null;
-        LocalDateTime dayEnd = date != null ? date.plusDays(1).atStartOfDay() : null;
+        LocalDateTime dayStart = airportClock.startOfDay(date);
+        LocalDateTime dayEnd = airportClock.startOfNextDay(date);
         String dir = normalizeAirport(direction);
         String originIata = normalizeAirport(origin);
         String destinationIata = normalizeAirport(destination);
@@ -209,29 +222,57 @@ public class FlightService {
 
     @Transactional
     public FlightRs create(FlightRq rq) {
-        Schedule schedule = scheduleRepository.findById(rq.getScheduleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Schedule", rq.getScheduleId()));
-        FlightHomeAirportRules.assertScheduleTouchesHome(schedule, homeIata);
-        Flight flight = Flight.builder()
-                .schedule(schedule)
-                .status(FlightStatus.SCHEDULED)
-                .build();
+        ScheduleSlot slot = scheduleSlotRepository.findById(rq.getSlotId())
+                .orElseThrow(() -> new ResourceNotFoundException("ScheduleSlot", rq.getSlotId()));
+        Schedule schedule = slot.getSchedule();
+        flightMutationBusinessRules.assertNoExistingFlightForSlot(
+                flightRepository.existsBySlot_SlotIdAndOperationDate(rq.getSlotId(), rq.getOperationDate()));
+        scheduleOccurrenceBusinessRules.assertMatchesOperationDate(schedule, slot, rq.getOperationDate());
+        FlightHomeAirportRules.assertValidHomeRoute(schedule, homeIata());
+        Flight flight = flightGenerationBusinessRules.buildFlight(schedule, slot, rq.getOperationDate());
         return mapper.toFlightRsSummary(flightRepository.save(flight));
+    }
+
+    @Transactional
+    public FlightGenerateRs generate(FlightGenerateRq rq) {
+        List<Schedule> schedules;
+        if (rq.getScheduleId() != null) {
+            Schedule schedule = scheduleRepository.findByIdWithSlots(rq.getScheduleId()).stream()
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Schedule", rq.getScheduleId()));
+            schedules = List.of(schedule);
+        } else {
+            schedules = scheduleRepository.findAllActiveWithSlots();
+        }
+
+        FlightGenerationBusinessRules.GenerationPlan plan = flightGenerationBusinessRules.planGeneration(
+                rq.getFromDate(),
+                rq.getToDate(),
+                schedules,
+                flightRepository::existsBySlot_SlotIdAndOperationDate);
+
+        List<Integer> flightIds = new ArrayList<>();
+        for (Flight draft : plan.toCreate()) {
+            FlightHomeAirportRules.assertValidHomeRoute(draft.getSchedule(), homeIata());
+            Flight saved = flightRepository.save(draft);
+            flightIds.add(saved.getFlightId());
+            realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(saved));
+        }
+
+        return FlightGenerateRs.builder()
+                .created(flightIds.size())
+                .skipped(plan.skipped())
+                .flightIds(flightIds)
+                .build();
     }
 
     @Transactional
     public FlightRs update(Integer flightId, FlightRq rq) {
         Flight flight = loadFlight(flightId);
         flightMutationBusinessRules.assertFlightEditable(flight.getStatus());
-        flightMutationBusinessRules.assertScheduleMutable(flight.getStatus());
-        Schedule schedule = scheduleRepository.findById(rq.getScheduleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Schedule", rq.getScheduleId()));
-        FlightHomeAirportRules.assertScheduleTouchesHome(schedule, homeIata);
-        flight.setSchedule(schedule);
-        Flight saved = flightRepository.save(flight);
-        FlightRs rs = mapper.toFlightRsSummary(saved);
-        realtimeNotificationService.publishFlightUpdate(rs);
-        return rs;
+        flightMutationBusinessRules.assertSlotNotChanged(flight.getSlot().getSlotId(), rq.getSlotId());
+        flightMutationBusinessRules.assertOperationDateNotChanged(flight.getOperationDate(), rq.getOperationDate());
+        return mapper.toFlightRsSummary(flight);
     }
 
     @Transactional
@@ -241,7 +282,7 @@ public class FlightService {
         touchCollections(flight);
         Schedule schedule = flight.getSchedule();
         FlightHomeAirportRules.OperationKind kind =
-                FlightHomeAirportRules.resolveOperationKind(schedule, homeIata);
+                FlightHomeAirportRules.resolveOperationKind(schedule, homeIata());
         flightStatusBusinessRules.assertManualTransition(flight.getStatus(), rq.getStatus(), kind);
 
         LocalDateTime now = airportClock.now();
@@ -252,9 +293,9 @@ public class FlightService {
                     : (flight.getActualDeparture() != null ? flight.getActualDeparture() : now);
             flightActualTimeRules.assertActualDeparture(actualDeparture, now);
             if (kind == FlightHomeAirportRules.OperationKind.DEPARTURE) {
-                FlightHomeAirportRules.assertManualTransitionToDeparted(flight, homeIata, actualDeparture);
+                FlightHomeAirportRules.assertManualTransitionToDeparted(flight, homeIata(), actualDeparture);
             } else {
-                FlightHomeAirportRules.assertManualInboundDeparture(flight, homeIata, actualDeparture);
+                FlightHomeAirportRules.assertManualInboundDeparture(flight, homeIata(), actualDeparture);
             }
             flight.setActualDeparture(actualDeparture);
             GateAssignment active = flight.getActiveGateAssignment();
@@ -268,16 +309,49 @@ public class FlightService {
             flightActualTimeRules.assertActualArrival(
                     actualArrival, flight.getActualDeparture(), now);
             if (kind == FlightHomeAirportRules.OperationKind.ARRIVAL) {
-                FlightHomeAirportRules.assertManualTransitionToArrived(flight, homeIata, actualArrival);
+                FlightHomeAirportRules.assertManualTransitionToArrived(flight, homeIata(), actualArrival);
             } else {
-                FlightHomeAirportRules.assertManualRemoteArrival(flight, homeIata, actualArrival);
+                FlightHomeAirportRules.assertManualRemoteArrival(flight, homeIata(), actualArrival);
             }
             if (actualArrival != null) {
                 flight.setActualArrival(actualArrival);
             }
+        } else if (rq.getStatus() == FlightStatus.CANCELLED) {
+            GateAssignment active = flight.getActiveGateAssignment();
+            gateAssignmentBusinessRules.closeActiveAssignmentAt(active, now);
         }
 
         flight.setStatus(rq.getStatus());
+        Flight saved = flightRepository.save(flight);
+        FlightRs rs = mapper.toFlightRsSummary(saved);
+        realtimeNotificationService.publishFlightUpdate(rs);
+        return rs;
+    }
+
+    @Transactional
+    public FlightRs correctActualTimes(Integer flightId, FlightActualTimesRq rq) {
+        Flight flight = loadFlight(flightId);
+        flightMutationBusinessRules.assertActualTimesCorrectable(flight.getStatus());
+        flightMutationBusinessRules.assertActualTimesCorrectionRequested(
+                rq.getActualDeparture(), rq.getActualArrival());
+
+        LocalDateTime mergedDeparture = rq.getActualDeparture() != null
+                ? rq.getActualDeparture()
+                : flight.getActualDeparture();
+        LocalDateTime mergedArrival = rq.getActualArrival() != null
+                ? rq.getActualArrival()
+                : flight.getActualArrival();
+
+        LocalDateTime now = airportClock.now();
+        flightActualTimeRules.assertCorrection(mergedDeparture, mergedArrival, now);
+
+        if (rq.getActualDeparture() != null) {
+            flight.setActualDeparture(rq.getActualDeparture());
+        }
+        if (rq.getActualArrival() != null) {
+            flight.setActualArrival(rq.getActualArrival());
+        }
+
         Flight saved = flightRepository.save(flight);
         FlightRs rs = mapper.toFlightRsSummary(saved);
         realtimeNotificationService.publishFlightUpdate(rs);
@@ -308,18 +382,21 @@ public class FlightService {
         flightMutationBusinessRules.assertFlightEditable(flight.getStatus());
         touchCollections(flight);
         flightMutationBusinessRules.assertResourcesMutable(flight.getStatus());
-        FlightHomeAirportRules.assertScheduleTouchesHome(flight.getSchedule(), homeIata);
+        FlightHomeAirportRules.assertValidHomeRoute(flight.getSchedule(), homeIata());
         Gate gate = gateRepository.findByIdForUpdate(rq.getGateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Gate", rq.getGateId()));
 
         gateAssignmentBusinessRules.assertGateIsActive(gate);
         gateAssignmentBusinessRules.assertValidInterval(rq.getAssignedFrom(), rq.getAssignedTo());
 
-        List<GateAssignment> overlaps = gateAssignmentRepository.findOverlapping(
+        gateAssignmentBusinessRules.closePriorAssignmentsForFlight(
+                flight.getGateAssignments(), rq.getAssignedFrom());
+
+        List<GateAssignment> overlaps = gateAssignmentRepository.findOverlappingForOtherFlights(
                 gate.getGateId(),
                 rq.getAssignedFrom(),
                 rq.getAssignedTo(),
-                null
+                flight.getFlightId()
         );
         gateAssignmentBusinessRules.assertNoOverlaps(overlaps);
         gateAssignmentBusinessRules.assertAircraftFitsGate(flight.getAircraftType(), gate);

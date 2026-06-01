@@ -102,8 +102,8 @@ public class ScheduleExportService {
             table.addCell(pdfCell(s.getAirline() != null ? s.getAirline().getIataCode() : "", font));
             table.addCell(pdfCell(s.getOriginAirport(), font));
             table.addCell(pdfCell(s.getDestinationAirport(), font));
-            table.addCell(pdfCell(s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : "", font));
-            table.addCell(pdfCell(s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : "", font));
+            table.addCell(pdfCell(s.getDepartureAtDate() != null ? FMT.format(s.getDepartureAtDate()) : "", font));
+            table.addCell(pdfCell(s.getArrivalAtDate() != null ? FMT.format(s.getArrivalAtDate()) : "", font));
             table.addCell(pdfCell(f != null && f.getStatus() != null ? f.getStatus().name() : "—", font));
             String gate = "";
             if (f != null && f.getCurrentGateAssignment() != null && f.getCurrentGateAssignment().getGate() != null) {
@@ -203,8 +203,8 @@ public class ScheduleExportService {
         row.createCell(c++).setCellValue(s.getAirline() != null ? s.getAirline().getIataCode() : "");
         row.createCell(c++).setCellValue(s.getOriginAirport() != null ? s.getOriginAirport() : "");
         row.createCell(c++).setCellValue(s.getDestinationAirport() != null ? s.getDestinationAirport() : "");
-        row.createCell(c++).setCellValue(s.getScheduledDeparture() != null ? FMT.format(s.getScheduledDeparture()) : "");
-        row.createCell(c++).setCellValue(s.getScheduledArrival() != null ? FMT.format(s.getScheduledArrival()) : "");
+        row.createCell(c++).setCellValue(s.getDepartureAtDate() != null ? FMT.format(s.getDepartureAtDate()) : "");
+        row.createCell(c++).setCellValue(s.getArrivalAtDate() != null ? FMT.format(s.getArrivalAtDate()) : "");
         row.createCell(c++).setCellValue(
                 flightRow != null && flightRow.getStatus() != null ? flightRow.getStatus().name() : "—");
         String gate = "";

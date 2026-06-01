@@ -9,6 +9,8 @@ import ru.airport.dto.GateAssignmentRs;
 import ru.airport.event.DelayWarningEvent;
 import ru.airport.event.FlightUpdateEvent;
 import ru.airport.event.GateChangeEvent;
+import ru.airport.event.OperationalEvent;
+import ru.airport.websocket.payload.OperationalEventPush;
 
 /**
  * Рассылка событий клиентам (табло, мобилка) — вызывается из прикладных сервисов и планировщика.
@@ -29,5 +31,9 @@ public class RealtimeNotificationService {
 
     public void publishGateChange(Integer flightId, GateAssignmentRs assignment) {
         eventPublisher.publishEvent(new GateChangeEvent(flightId, assignment));
+    }
+
+    public void publishOperationalEvent(OperationalEventPush event) {
+        eventPublisher.publishEvent(new OperationalEvent(event));
     }
 }

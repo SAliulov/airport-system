@@ -34,20 +34,9 @@ public final class FlightHomeAirportRules {
         throw new BadRequestException("Рейс не относится к базовому аэропорту");
     }
 
-    public static void assertScheduleTouchesHome(Schedule schedule, String homeIata) {
+    /** Маршрут должен проходить через базовый аэропорт ровно на одном конце (вылет или прилёт). */
+    public static void assertValidHomeRoute(Schedule schedule, String homeIata) {
         resolveOperationKind(schedule, homeIata);
-    }
-
-    public static void assertScheduleIncludesHome(Schedule schedule, String homeIata) {
-        String home = normalize(homeIata);
-        String origin = normalize(schedule.getOriginAirport());
-        String destination = normalize(schedule.getDestinationAirport());
-        if (!home.equals(origin) && !home.equals(destination)) {
-            throw new BadRequestException("Расписание должно включать базовый аэропорт " + home);
-        }
-        if (home.equals(origin) && home.equals(destination)) {
-            throw new BadRequestException("Расписание должно включать базовый аэропорт " + home);
-        }
     }
 
     public static void assertManualTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {

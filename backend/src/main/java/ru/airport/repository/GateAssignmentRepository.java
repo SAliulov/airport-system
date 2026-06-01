@@ -52,6 +52,23 @@ public interface GateAssignmentRepository extends JpaRepository<GateAssignment, 
     );
 
     /**
+     * Пересечения на гейте только с назначениями других рейсов (текущий рейс исключён).
+     */
+    @Query("""
+            SELECT ga FROM GateAssignment ga
+            WHERE ga.gate.gateId = :gateId
+              AND ga.flight.flightId <> :excludeFlightId
+              AND ga.assignedFrom < :to
+              AND ga.assignedTo > :from
+            """)
+    List<GateAssignment> findOverlappingForOtherFlights(
+            @Param("gateId") Integer gateId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("excludeFlightId") Integer excludeFlightId
+    );
+
+    /**
      * Все назначения гейтов за указанный день.
      * Используется для визуализации timeline (задача 7).
      */

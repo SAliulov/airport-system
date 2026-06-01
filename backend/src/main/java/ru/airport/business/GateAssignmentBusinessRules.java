@@ -42,4 +42,35 @@ public class GateAssignmentBusinessRules {
                     "Категория размера ВС несовместима с гейтом " + gate.getGateNumber());
         }
     }
+
+    /**
+     * Закрывает «хвост» предыдущих назначений рейса перед новым интервалом (смена гейта или времени).
+     */
+    public void closePriorAssignmentsForFlight(List<GateAssignment> assignments, LocalDateTime newFrom) {
+        if (assignments == null || newFrom == null) {
+            return;
+        }
+        for (GateAssignment ga : assignments) {
+            if (ga.getAssignedTo() == null || !ga.getAssignedTo().isAfter(newFrom)) {
+                continue;
+            }
+            ga.setAssignedTo(newFrom);
+            if (!ga.getAssignedFrom().isBefore(ga.getAssignedTo())) {
+                ga.setAssignedTo(ga.getAssignedFrom().plusMinutes(1));
+            }
+        }
+    }
+
+    /** Освобождает гейт при отмене / завершении: обрезает активное назначение до {@code endAt}. */
+    public void closeActiveAssignmentAt(GateAssignment assignment, LocalDateTime endAt) {
+        if (assignment == null || endAt == null) {
+            return;
+        }
+        if (assignment.getAssignedTo() != null && assignment.getAssignedTo().isAfter(endAt)) {
+            assignment.setAssignedTo(endAt);
+            if (!assignment.getAssignedFrom().isBefore(assignment.getAssignedTo())) {
+                assignment.setAssignedTo(assignment.getAssignedFrom().plusMinutes(1));
+            }
+        }
+    }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../config.dart';
+import '../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,8 +20,26 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _serverCtrl = TextEditingController();
   bool _loading = false;
+  bool _configReady = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConfig();
+  }
+
+  Future<void> _initConfig() async {
+    await AppConfig.ensureLoaded();
+    if (mounted) {
+      setState(() {
+        _serverCtrl.text = AppConfig.apiBase;
+        _configReady = true;
+      });
+    }
+  }
 
   Future<void> _login() async {
     setState(() {
@@ -27,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
+      await AppConfig.setApiBase(_serverCtrl.text.trim());
       await widget.auth.login(
         _userCtrl.text.trim(),
         _passCtrl.text,
@@ -45,76 +66,103 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _userCtrl.dispose();
     _passCtrl.dispose();
+    _serverCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_configReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.flight, size: 72, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 12),
-              Text(
-                'Аэропорт',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Оперативный персонал',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _userCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Логин',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/branding/assur_logo.png',
+                  width: 88,
+                  height: 88,
+                  fit: BoxFit.contain,
                 ),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Пароль',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _login(),
-              ),
-              if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  onPressed: _loading ? null : _login,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Войти'),
+                Text(
+                  'АСУРР',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  'Оперативный персонал',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                ),
+                const SizedBox(height: 28),
+                TextField(
+                  controller: _serverCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Адрес сервера',
+                    hintText: 'http://192.168.0.25:8080',
+                    prefixIcon: Icon(Icons.dns),
+                  ),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _userCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Логин',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Пароль',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _login(),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _loading ? null : _login,
+                    child: _loading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Войти'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

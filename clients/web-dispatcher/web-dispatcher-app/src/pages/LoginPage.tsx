@@ -1,6 +1,23 @@
+import axios from 'axios';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
+import { brandingLogoUrl } from '../utils/branding';
+
+function loginErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    if (status === 401) return 'Неверный логин или пароль';
+    if (status === 403) return 'Недостаточно прав для выполнения операции';
+    const backend = err.response?.data;
+    if (backend && typeof backend === 'object' && 'error' in backend) {
+      const msg = (backend as { error?: string }).error;
+      if (msg) return msg;
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return 'Ошибка входа';
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -19,9 +36,7 @@ export default function LoginPage() {
       await login(username, password);
       navigate('/', { replace: true });
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Ошибка входа',
-      );
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -30,9 +45,11 @@ export default function LoginPage() {
   return (
     <div className="login-wrapper">
       <form className="login-card" onSubmit={handle}>
-        <div className="login-logo">✈</div>
-        <h2>Диспетчер</h2>
-        <p className="login-sub">Управление рейсами аэропорта</p>
+        <div className="login-logo">
+          <img src={brandingLogoUrl()} alt="АСУРР" />
+        </div>
+        <h2>АСУРР</h2>
+        <p className="login-sub">Диспетчерская служба аэропорта Шереметьево</p>
         <label>
           Логин
           <input

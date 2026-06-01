@@ -11,15 +11,15 @@ import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Плановый вылет должен быть строго раньше планового прилёта.
+ * Базовая проверка слотов: непустой список, overnight допустим (arrival &lt;= departure).
  */
 @Documented
-@Constraint(validatedBy = ValidScheduleIntervalValidator.class)
+@Constraint(validatedBy = ValidScheduleSlotsValidator.class)
 @Target(TYPE)
 @Retention(RUNTIME)
-public @interface ValidScheduleInterval {
+public @interface ValidScheduleSlots {
 
-    String message() default "Плановый вылет должен быть строго раньше планового прилёта";
+    String message() default "Некорректные слоты расписания";
 
     Class<?>[] groups() default {};
 

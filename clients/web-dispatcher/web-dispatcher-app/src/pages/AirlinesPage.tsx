@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import PageStatus from '../components/PageStatus';
+import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import { createAirline, deleteAirline, getAirlines, updateAirline } from '../services/api';
 import type { AirlineRs } from '../types';
+import { formatApiError } from '../utils/apiError';
+import { validateAirlineForm } from '../utils/fieldValidation';
 
 const EMPTY = { iataCode: '', name: '', country: '' };
 
@@ -8,49 +12,104 @@ export default function AirlinesPage() {
   const [items, setItems] = useState<AirlineRs[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const load = () => getAirlines().then(setItems).catch(e => setError(String(e)));
+  const load = useCallback(() => {
+    setPageError(null);
+    getAirlines()
+      .then(setItems)
+      .catch(e => setPageError(formatApiError(e)));
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  const waitingForServer = useRetryWhenBackendUp(pageError, setPageError, load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function save() {
-    setError(null);
+    setPageError(null);
+    const validation = validateAirlineForm(form);
+    if (!validation.ok) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+    setFieldErrors({});
     try {
       if (editing != null) await updateAirline(editing, form);
       else await createAirline(form);
-      setForm(EMPTY); setEditing(null); load();
-    } catch (e: unknown) { setError(apiErr(e)); }
+      setForm(EMPTY);
+      setEditing(null);
+      load();
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
+    }
   }
 
   async function remove(id: number) {
     if (!confirm('Удалить авиакомпанию?')) return;
-    setError(null);
-    try { await deleteAirline(id); load(); }
-    catch (e: unknown) { setError(apiErr(e)); }
+    setPageError(null);
+    try {
+      await deleteAirline(id);
+      load();
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
+    }
   }
 
   function startEdit(a: AirlineRs) {
     setEditing(a.airlineId);
+    setFieldErrors({});
     setForm({ iataCode: a.iataCode, name: a.name, country: a.country ?? '' });
+  }
+
+  function clearForm() {
+    setEditing(null);
+    setForm(EMPTY);
+    setFieldErrors({});
   }
 
   return (
     <div className="page">
       <h1>Авиакомпании</h1>
-      {error && <p className="page-error">{error}</p>}
+      <PageStatus error={pageError} waitingForServer={waitingForServer} />
       <div className="form-row">
-        <input placeholder="IATA (2 буквы)" maxLength={2} value={form.iataCode}
-          onChange={e => setForm(f => ({ ...f, iataCode: e.target.value.toUpperCase() }))} />
-        <input placeholder="Название" value={form.name}
-          onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-        <input placeholder="Страна" value={form.country}
-          onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
+        <div className="inline-field">
+          <input
+            placeholder="IATA (2 символа)"
+            maxLength={2}
+            value={form.iataCode}
+            className={fieldErrors.iataCode ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, iataCode: e.target.value.toUpperCase() }))}
+          />
+          {fieldErrors.iataCode && <span className="modal-field__error">{fieldErrors.iataCode}</span>}
+        </div>
+        <div className="inline-field">
+          <input
+            placeholder="Название"
+            maxLength={100}
+            value={form.name}
+            className={fieldErrors.name ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          />
+          {fieldErrors.name && <span className="modal-field__error">{fieldErrors.name}</span>}
+        </div>
+        <div className="inline-field">
+          <input
+            placeholder="Страна"
+            maxLength={77}
+            value={form.country}
+            className={fieldErrors.country ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
+          />
+          {fieldErrors.country && <span className="modal-field__error">{fieldErrors.country}</span>}
+        </div>
         <button className="btn-primary btn-sm" onClick={save}>
           {editing != null ? 'Сохранить' : 'Добавить'}
         </button>
         {editing != null && (
-          <button className="btn-ghost btn-sm" onClick={() => { setEditing(null); setForm(EMPTY); }}>
+          <button className="btn-ghost btn-sm" onClick={clearForm}>
             Отмена
           </button>
         )}
@@ -71,9 +130,4 @@ export default function AirlinesPage() {
       </table>
     </div>
   );
-}
-
-function apiErr(e: unknown) {
-  if (e instanceof Error) return e.message;
-  return String(e);
 }

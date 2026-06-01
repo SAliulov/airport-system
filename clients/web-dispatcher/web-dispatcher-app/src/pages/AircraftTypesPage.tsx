@@ -1,42 +1,71 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import PageStatus from '../components/PageStatus';
+import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import { createAircraftType, deleteAircraftType, getAircraftTypes, updateAircraftType } from '../services/api';
 import type { AircraftTypeRs } from '../types';
+import { formatApiError } from '../utils/apiError';
+import { validateAircraftTypeForm } from '../utils/fieldValidation';
 
 const EMPTY = { icaoCode: '', passengerCapacity: '', sizeCategory: 'NARROW' };
-
-function apiErr(e: unknown) { return e instanceof Error ? e.message : String(e); }
 
 export default function AircraftTypesPage() {
   const [items, setItems] = useState<AircraftTypeRs[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const load = () => getAircraftTypes().then(setItems).catch(e => setError(apiErr(e)));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => {
+    setPageError(null);
+    getAircraftTypes()
+      .then(setItems)
+      .catch(e => setPageError(formatApiError(e)));
+  }, []);
+
+  const waitingForServer = useRetryWhenBackendUp(pageError, setPageError, load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function save() {
-    setError(null);
+    setPageError(null);
+    const validation = validateAircraftTypeForm(form);
+    if (!validation.ok) {
+      setFieldErrors(validation.errors);
+      return;
+    }
+    setFieldErrors({});
     const body = {
-      icaoCode: form.icaoCode,
+      icaoCode: form.icaoCode.trim().toUpperCase(),
       passengerCapacity: form.passengerCapacity ? Number(form.passengerCapacity) : undefined,
       sizeCategory: form.sizeCategory,
     };
     try {
       if (editing != null) await updateAircraftType(editing, body);
       else await createAircraftType(body);
-      setForm(EMPTY); setEditing(null); load();
-    } catch (e: unknown) { setError(apiErr(e)); }
+      setForm(EMPTY);
+      setEditing(null);
+      load();
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
+    }
   }
 
   async function remove(id: number) {
     if (!confirm('Удалить тип ВС?')) return;
-    try { await deleteAircraftType(id); load(); }
-    catch (e: unknown) { setError(apiErr(e)); }
+    setPageError(null);
+    try {
+      await deleteAircraftType(id);
+      load();
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
+    }
   }
 
   function startEdit(a: AircraftTypeRs) {
     setEditing(a.aircraftTypeId);
+    setFieldErrors({});
     setForm({
       icaoCode: a.icaoCode,
       passengerCapacity: String(a.passengerCapacity ?? ''),
@@ -44,26 +73,57 @@ export default function AircraftTypesPage() {
     });
   }
 
+  function clearForm() {
+    setEditing(null);
+    setForm(EMPTY);
+    setFieldErrors({});
+  }
+
   return (
     <div className="page">
       <h1>Типы воздушных судов</h1>
-      {error && <p className="page-error">{error}</p>}
+      <PageStatus error={pageError} waitingForServer={waitingForServer} />
       <div className="form-row">
-        <input placeholder="ICAO (4 буквы)" maxLength={4} value={form.icaoCode}
-          onChange={e => setForm(f => ({ ...f, icaoCode: e.target.value.toUpperCase() }))} />
-        <input placeholder="Вместимость" type="number" min={0} value={form.passengerCapacity}
-          onChange={e => setForm(f => ({ ...f, passengerCapacity: e.target.value }))} />
-        <select value={form.sizeCategory}
-          onChange={e => setForm(f => ({ ...f, sizeCategory: e.target.value }))}>
-          <option value="NARROW">NARROW</option>
-          <option value="WIDE">WIDE</option>
-          <option value="JUMBO">JUMBO</option>
-        </select>
+        <div className="inline-field">
+          <input
+            placeholder="ICAO (2–4 символа)"
+            maxLength={4}
+            value={form.icaoCode}
+            className={fieldErrors.icaoCode ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, icaoCode: e.target.value.toUpperCase() }))}
+          />
+          {fieldErrors.icaoCode && <span className="modal-field__error">{fieldErrors.icaoCode}</span>}
+        </div>
+        <div className="inline-field">
+          <input
+            placeholder="Вместимость"
+            type="number"
+            min={0}
+            value={form.passengerCapacity}
+            className={fieldErrors.passengerCapacity ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, passengerCapacity: e.target.value }))}
+          />
+          {fieldErrors.passengerCapacity && (
+            <span className="modal-field__error">{fieldErrors.passengerCapacity}</span>
+          )}
+        </div>
+        <div className="inline-field">
+          <select
+            value={form.sizeCategory}
+            className={fieldErrors.sizeCategory ? 'field-invalid' : undefined}
+            onChange={e => setForm(f => ({ ...f, sizeCategory: e.target.value }))}
+          >
+            <option value="NARROW">NARROW</option>
+            <option value="WIDE">WIDE</option>
+            <option value="JUMBO">JUMBO</option>
+          </select>
+          {fieldErrors.sizeCategory && <span className="modal-field__error">{fieldErrors.sizeCategory}</span>}
+        </div>
         <button className="btn-primary btn-sm" onClick={save}>
           {editing != null ? 'Сохранить' : 'Добавить'}
         </button>
         {editing != null && (
-          <button className="btn-ghost btn-sm" onClick={() => { setEditing(null); setForm(EMPTY); }}>
+          <button className="btn-ghost btn-sm" onClick={clearForm}>
             Отмена
           </button>
         )}

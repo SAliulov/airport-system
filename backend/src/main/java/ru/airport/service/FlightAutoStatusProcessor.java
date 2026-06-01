@@ -2,7 +2,6 @@ package ru.airport.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,14 +39,15 @@ public class FlightAutoStatusProcessor {
     private final AirportClock airportClock;
     private final AirportProperties airportProperties;
 
-    @Value("${airport.home-iata}")
-    private String homeIata;
+    private String homeIata() {
+        return airportProperties.getHomeIata();
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processFlightAutoRules(Integer flightId, Instant now) {
         Flight flight = loadFlightForProcessing(flightId);
         Schedule schedule = flight.getSchedule();
-        String home = normalize(homeIata);
+        String home = normalize(homeIata());
         String origin = normalize(schedule.getOriginAirport());
         String destination = normalize(schedule.getDestinationAirport());
         boolean fromHome = home.equals(origin);
@@ -70,6 +70,8 @@ public class FlightAutoStatusProcessor {
         if (toHome && !fromHome) {
             tryInboundAutoDeparture(flight, schedule, now);
             flight = loadFlightForProcessing(flightId);
+            tryInboundAutoDelayMissedDeparture(flight, schedule, now);
+            flight = loadFlightForProcessing(flightId);
             tryInboundAutoDelayNoGate(flight, schedule, now);
         }
     }
@@ -83,14 +85,14 @@ public class FlightAutoStatusProcessor {
             return;
         }
         int cancelHours = airportProperties.getScheduler().getAutoCancelHoursAfterScheduledDeparture();
-        Instant cancelAfter = airportClock.toInstant(schedule.getScheduledDeparture())
+        Instant cancelAfter = airportClock.toInstant(flight.getScheduledDeparture())
                 .plus(Duration.ofHours(cancelHours));
         if (now.isBefore(cancelAfter)) {
             return;
         }
         flightStatusBusinessRules.assertAutoCancel(status);
         LocalDateTime nowLocal = airportClock.toLocal(now);
-        long minutes = Duration.between(schedule.getScheduledDeparture(), nowLocal).toMinutes();
+        long minutes = Duration.between(flight.getScheduledDeparture(), nowLocal).toMinutes();
         int delayMinutes = (int) Math.max(1, minutes);
         flight.setStatus(FlightStatus.CANCELLED);
         DelayWarning warning = DelayWarning.builder()
@@ -110,14 +112,14 @@ public class FlightAutoStatusProcessor {
             return;
         }
         int graceMinutes = airportProperties.getScheduler().getOutboundDelayGraceMinutes();
-        Instant delayAfter = airportClock.toInstant(schedule.getScheduledDeparture())
+        Instant delayAfter = airportClock.toInstant(flight.getScheduledDeparture())
                 .plus(Duration.ofMinutes(graceMinutes));
         if (now.isBefore(delayAfter)) {
             return;
         }
         flightStatusBusinessRules.assertAutoDelay(flight.getStatus());
         LocalDateTime nowLocal = airportClock.toLocal(now);
-        long minutes = Duration.between(schedule.getScheduledDeparture(), nowLocal).toMinutes();
+        long minutes = Duration.between(flight.getScheduledDeparture(), nowLocal).toMinutes();
         int delayMinutes = (int) Math.max(1, minutes);
         flight.setStatus(FlightStatus.DELAYED);
         DelayWarning warning = DelayWarning.builder()
@@ -139,7 +141,7 @@ public class FlightAutoStatusProcessor {
         if (flight.getActualDeparture() != null) {
             return;
         }
-        if (now.isBefore(airportClock.toInstant(schedule.getScheduledDeparture()))) {
+        if (now.isBefore(airportClock.toInstant(flight.getScheduledDeparture()))) {
             return;
         }
         if (flight.getAircraftType() == null) {
@@ -148,8 +150,8 @@ public class FlightAutoStatusProcessor {
             return;
         }
         flightStatusBusinessRules.assertAutoDeparture(flight.getStatus());
-        LocalDateTime actualDeparture = schedule.getScheduledDeparture();
-        FlightHomeAirportRules.assertAutoTransitionToDeparted(flight, homeIata, actualDeparture);
+        LocalDateTime actualDeparture = flight.getScheduledDeparture();
+        FlightHomeAirportRules.assertAutoTransitionToDeparted(flight, homeIata(), actualDeparture);
         flight.setActualDeparture(actualDeparture);
         flight.setStatus(FlightStatus.DEPARTED);
         Flight saved = flightRepository.save(flight);
@@ -160,17 +162,50 @@ public class FlightAutoStatusProcessor {
         if (flight.getStatus() != FlightStatus.DEPARTED || flight.getActualDeparture() == null) {
             return;
         }
-        Duration flightDuration = Duration.between(schedule.getScheduledDeparture(), schedule.getScheduledArrival());
+        Duration flightDuration = Duration.between(flight.getScheduledDeparture(), flight.getScheduledArrival());
         LocalDateTime expectedArrival = flight.getActualDeparture().plus(flightDuration);
         if (now.isBefore(airportClock.toInstant(expectedArrival))) {
             return;
         }
         flightStatusBusinessRules.assertAutoArrival(flight.getStatus());
-        FlightHomeAirportRules.assertAutoTransitionToArrived(flight, homeIata, expectedArrival);
+        FlightHomeAirportRules.assertAutoTransitionToArrived(flight, homeIata(), expectedArrival);
         flight.setActualArrival(expectedArrival);
         flight.setStatus(FlightStatus.ARRIVED);
         Flight saved = flightRepository.save(flight);
         realtimeNotificationService.publishFlightUpdate(dtoMapper.toFlightRsSummary(saved));
+    }
+
+    private void tryInboundAutoDelayMissedDeparture(Flight flight, Schedule schedule, Instant now) {
+        if (flight.getStatus() != FlightStatus.SCHEDULED) {
+            return;
+        }
+        if (flight.getActualDeparture() != null) {
+            return;
+        }
+        int graceMinutes = airportProperties.getScheduler().getOutboundDelayGraceMinutes();
+        Instant delayAfter = airportClock.toInstant(flight.getScheduledDeparture())
+                .plus(Duration.ofMinutes(graceMinutes));
+        if (now.isBefore(delayAfter)) {
+            return;
+        }
+        if (flight.getAircraftType() != null) {
+            return;
+        }
+        flightStatusBusinessRules.assertAutoDelay(flight.getStatus());
+        LocalDateTime nowLocal = airportClock.toLocal(now);
+        long minutes = Duration.between(flight.getScheduledDeparture(), nowLocal).toMinutes();
+        int delayMinutes = (int) Math.max(1, minutes);
+        flight.setStatus(FlightStatus.DELAYED);
+        DelayWarning warning = DelayWarning.builder()
+                .delayMinutes(delayMinutes)
+                .reason(FlightAutoStatusService.AUTO_INBOUND_MISSED_DEPARTURE_REASON)
+                .createdAt(nowLocal)
+                .flight(flight)
+                .build();
+        Flight saved = flightRepository.save(flight);
+        var warningRs = dtoMapper.toDelayWarningRs(delayWarningRepository.save(warning));
+        realtimeNotificationService.publishFlightUpdate(dtoMapper.toFlightRsSummary(saved));
+        realtimeNotificationService.publishDelayWarning(saved.getFlightId(), warningRs);
     }
 
     private void tryInboundAutoDelayNoGate(Flight flight, Schedule schedule, Instant now) {
@@ -181,14 +216,14 @@ public class FlightAutoStatusProcessor {
             return;
         }
         int graceMinutes = airportProperties.getScheduler().getInboundGateDelayMinutes();
-        Instant delayAfter = airportClock.toInstant(schedule.getScheduledArrival())
+        Instant delayAfter = airportClock.toInstant(flight.getScheduledArrival())
                 .plus(Duration.ofMinutes(graceMinutes));
         if (now.isBefore(delayAfter)) {
             return;
         }
         flightStatusBusinessRules.assertAutoDelayNoGate(flight.getStatus());
         LocalDateTime nowLocal = airportClock.toLocal(now);
-        long minutes = Duration.between(schedule.getScheduledArrival(), nowLocal).toMinutes();
+        long minutes = Duration.between(flight.getScheduledArrival(), nowLocal).toMinutes();
         int delayMinutes = (int) Math.max(1, minutes);
         flight.setStatus(FlightStatus.DELAYED);
         DelayWarning warning = DelayWarning.builder()

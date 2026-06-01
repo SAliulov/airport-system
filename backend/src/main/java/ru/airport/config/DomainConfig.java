@@ -6,11 +6,15 @@ import ru.airport.business.AircraftTypeBusinessRules;
 import ru.airport.business.AirlineBusinessRules;
 import ru.airport.business.DelayWarningBusinessRules;
 import ru.airport.business.FlightActualTimeRules;
+import ru.airport.business.FlightGenerationBusinessRules;
 import ru.airport.business.FlightMutationBusinessRules;
 import ru.airport.business.FlightStatusBusinessRules;
 import ru.airport.business.GateAssignmentBusinessRules;
 import ru.airport.business.GateBusinessRules;
 import ru.airport.business.ScheduleBusinessRules;
+import ru.airport.business.ScheduleOccurrenceBusinessRules;
+import ru.airport.business.SchedulePeriodicityBusinessRules;
+import ru.airport.business.ScheduleSlotBusinessRules;
 
 @Configuration
 public class DomainConfig {
@@ -58,5 +62,29 @@ public class DomainConfig {
     @Bean
     public ScheduleBusinessRules scheduleBusinessRules() {
         return new ScheduleBusinessRules();
+    }
+
+    @Bean
+    public SchedulePeriodicityBusinessRules schedulePeriodicityBusinessRules() {
+        return new SchedulePeriodicityBusinessRules();
+    }
+
+    @Bean
+    public ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules(
+            SchedulePeriodicityBusinessRules schedulePeriodicityBusinessRules) {
+        return new ScheduleOccurrenceBusinessRules(schedulePeriodicityBusinessRules);
+    }
+
+    @Bean
+    public ScheduleSlotBusinessRules scheduleSlotBusinessRules(
+            ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules) {
+        return new ScheduleSlotBusinessRules(scheduleOccurrenceBusinessRules);
+    }
+
+    @Bean
+    public FlightGenerationBusinessRules flightGenerationBusinessRules(
+            SchedulePeriodicityBusinessRules schedulePeriodicityBusinessRules,
+            ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules) {
+        return new FlightGenerationBusinessRules(schedulePeriodicityBusinessRules, scheduleOccurrenceBusinessRules);
     }
 }

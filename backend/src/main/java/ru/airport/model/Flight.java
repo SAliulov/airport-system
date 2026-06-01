@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +31,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"schedule", "aircraftType", "gateAssignments", "delayWarnings"})
+@ToString(exclude = {"schedule", "slot", "aircraftType", "gateAssignments", "delayWarnings"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Flight {
 
@@ -64,11 +65,29 @@ public class Flight {
     @Builder.Default
     private FlightStatus status = FlightStatus.SCHEDULED;
 
+    /** Дата выполнения рейса (календарный день операции). */
+    @Column(name = "operation_date", nullable = false)
+    private LocalDate operationDate;
+
+    /** Плановое время вылета на {@link #operationDate}. */
+    @Column(name = "scheduled_departure", nullable = false)
+    private LocalDateTime scheduledDeparture;
+
+    /** Плановое время прилёта (может быть на следующий календарный день). */
+    @Column(name = "scheduled_arrival", nullable = false)
+    private LocalDateTime scheduledArrival;
+
     // ───── Связи ──────────────────────────────────────────────────────────
 
     /**
-     * Ссылка на плановое расписание.
-     * NOT NULL, ON DELETE RESTRICT.
+     * Слот шаблона, из которого создан экземпляр.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "slot_id", nullable = false)
+    private ScheduleSlot slot;
+
+    /**
+     * Шаблон расписания (денормализованная связь для запросов).
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "schedule_id", nullable = false)

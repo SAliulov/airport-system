@@ -1,16 +1,41 @@
-/// Конфигурация подключения к backend.
-class AppConfig {
-  /// HTTP base URL backend. На Android-эмуляторе `10.0.2.2` — хост-машина.
-  /// В Chrome (web) — `localhost`. Переопределяется через `--dart-define=API_BASE=...`.
-  static const String apiBase = String.fromEnvironment(
-    'API_BASE',
-    defaultValue: 'http://localhost:8080',
-  );
+import 'package:shared_preferences/shared_preferences.dart';
 
-  /// WebSocket URL для STOMP (SockJS raw fallback).
+/// Конфигурация подключения к backend (runtime + compile-time override).
+class AppConfig {
+  static const String _prefsKey = 'api_base';
+  static const String defaultApiBase = 'http://192.168.0.25:8080';
+
+  static String _apiBase = defaultApiBase;
+  static bool _loaded = false;
+
+  static String get apiBase => _apiBase;
+
   static String get wsUrl {
-    final uri = Uri.parse(apiBase);
+    final uri = Uri.parse(_apiBase);
     final scheme = uri.scheme == 'https' ? 'wss' : 'ws';
-    return '$scheme://${uri.host}:${uri.port}/ws/websocket';
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    return '$scheme://${uri.host}:$port/ws/websocket';
+  }
+
+  /// Загрузить сохранённый адрес или `--dart-define=API_BASE=...`.
+  static Future<void> ensureLoaded() async {
+    if (_loaded) return;
+    const fromEnv = String.fromEnvironment('API_BASE');
+    if (fromEnv.isNotEmpty) {
+      _apiBase = fromEnv;
+      _loaded = true;
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _apiBase = prefs.getString(_prefsKey) ?? defaultApiBase;
+    _loaded = true;
+  }
+
+  static Future<void> setApiBase(String value) async {
+    final trimmed = value.trim().replaceAll(RegExp(r'/+$'), '');
+    _apiBase = trimmed.isEmpty ? defaultApiBase : trimmed;
+    _loaded = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, _apiBase);
   }
 }

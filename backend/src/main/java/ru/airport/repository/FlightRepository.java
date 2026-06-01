@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import ru.airport.model.Flight;
 import ru.airport.model.FlightStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -19,6 +20,10 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
 
     boolean existsBySchedule_ScheduleId(Integer scheduleId);
 
+    boolean existsBySlot_SlotId(Integer slotId);
+
+    boolean existsBySlot_SlotIdAndOperationDate(Integer slotId, LocalDate operationDate);
+
     boolean existsByAircraftType_AircraftTypeId(Integer aircraftTypeId);
 
     List<Flight> findByStatus(FlightStatus status);
@@ -27,21 +32,18 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
 
     @Query("""
             SELECT f FROM Flight f
-            JOIN f.schedule s
-            WHERE s.scheduledDeparture >= :dayStart
-              AND s.scheduledDeparture < :dayEnd
-            ORDER BY s.scheduledDeparture
+            WHERE f.scheduledDeparture >= :dayStart
+              AND f.scheduledDeparture < :dayEnd
+            ORDER BY f.scheduledDeparture
             """)
     List<Flight> findByDay(
             @Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd") LocalDateTime dayEnd);
 
-    /**
-     * Кандидаты для планировщика: активные статусы, правила направления — в {@link ru.airport.service.FlightAutoStatusService}.
-     */
     @Query("""
             SELECT DISTINCT f FROM Flight f
             JOIN FETCH f.schedule s
+            JOIN FETCH f.slot sl
             LEFT JOIN FETCH f.aircraftType
             WHERE f.status IN (:statuses)
             """)
@@ -50,6 +52,7 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
     @Query("""
             SELECT f FROM Flight f
             JOIN FETCH f.schedule s
+            JOIN FETCH f.slot sl
             LEFT JOIN FETCH f.aircraftType
             LEFT JOIN FETCH f.gateAssignments
             WHERE f.flightId = :flightId
@@ -60,8 +63,9 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
             SELECT DISTINCT f FROM Flight f
             JOIN FETCH f.schedule s
             JOIN FETCH s.airline a
+            JOIN FETCH f.slot sl
             LEFT JOIN FETCH f.aircraftType
-            ORDER BY s.scheduledDeparture
+            ORDER BY f.scheduledDeparture ASC, f.flightId ASC
             """)
     List<Flight> findAllForApiList();
 }

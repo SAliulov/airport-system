@@ -8,10 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Тело запроса: создание конкретного выполняемого рейса по {@code scheduleId}.
- * Задача 2; REST: {@code POST /api/v1/flights}.
- */
+import java.time.LocalDate;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,5 +19,8 @@ public class FlightRq {
 
     @NotNull
     @Positive
-    private Integer scheduleId;
+    private Integer slotId;
+
+    @NotNull
+    private LocalDate operationDate;
 }

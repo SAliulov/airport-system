@@ -1,5 +1,6 @@
 export type FlightStatus = 'SCHEDULED' | 'DEPARTED' | 'ARRIVED' | 'DELAYED' | 'CANCELLED';
 export type SizeCategory = 'NARROW' | 'WIDE' | 'JUMBO';
+export type PeriodicityType = 'WEEKLY' | 'INTERVAL';
 
 export interface AirlineRs {
   airlineId: number;
@@ -27,6 +28,7 @@ export interface GateSummaryRs {
   gateId: number;
   gateNumber: string;
   terminal?: string;
+  maxSizeCategory?: SizeCategory;
 }
 
 export interface GateAssignmentRs {
@@ -43,19 +45,36 @@ export interface DelayWarningRs {
   createdAt?: string;
 }
 
+export interface ScheduleSlotRs {
+  slotId: number;
+  dayOfWeek?: number;
+  departureTime: string;
+  arrivalTime: string;
+}
+
 export interface ScheduleRs {
   scheduleId: number;
   flightNumber: string;
   originAirport: string;
   destinationAirport: string;
-  scheduledDeparture: string;
-  scheduledArrival: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  isActive?: boolean;
+  periodicityType: PeriodicityType;
+  periodicityStep: number;
   airline?: AirlineRs;
+  slots?: ScheduleSlotRs[];
+  /** При фильтрации по дате — вычисленные времена на этот день. */
+  departureAtDate?: string;
+  arrivalAtDate?: string;
 }
 
 export interface FlightRs {
   flightId: number;
   status: FlightStatus;
+  operationDate?: string;
+  scheduledDeparture?: string;
+  scheduledArrival?: string;
   actualDeparture?: string;
   actualArrival?: string;
   schedule: ScheduleRs;
@@ -65,12 +84,25 @@ export interface FlightRs {
   delayWarnings?: DelayWarningRs[];
 }
 
+export interface FlightGenerateRq {
+  fromDate: string;
+  toDate: string;
+  scheduleId?: number;
+}
+
+export interface FlightGenerateRs {
+  created: number;
+  skipped: number;
+  flightIds: number[];
+}
+
 export interface GateTimelineSegmentRs {
   gateId: number;
   gateNumber: string;
   terminal?: string;
   flightId: number;
   flightNumber: string;
+  flightStatus?: FlightStatus;
   assignedFrom: string;
   assignedTo: string;
 }

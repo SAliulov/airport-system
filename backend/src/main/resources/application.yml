@@ -8,7 +8,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none        # Flyway управляет схемой, Hibernate только проверяет
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
