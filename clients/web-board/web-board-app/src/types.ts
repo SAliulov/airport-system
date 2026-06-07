@@ -54,6 +54,21 @@ export interface FlightRs {
   currentGateAssignment?: GateAssignmentRs;
 }
 
+export interface GateRs {
+  gateId: number;
+  gateNumber: string;
+  terminal?: string;
+  isActive: boolean;
+}
+
+export interface PageRs<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 export interface FlightStatusPush {
   flightId: number;
   status: string;

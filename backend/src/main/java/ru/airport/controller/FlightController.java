@@ -27,6 +27,7 @@ import ru.airport.dto.FlightRs;
 import ru.airport.dto.FlightStatusUpdateRq;
 import ru.airport.dto.GateAssignmentRq;
 import ru.airport.dto.GateAssignmentRs;
+import ru.airport.dto.PageRs;
 import ru.airport.service.FlightService;
 
 import java.time.LocalDate;
@@ -40,25 +41,35 @@ public class FlightController {
     private final FlightService flightService;
 
     @GetMapping
-    public List<FlightRs> listAll() {
-        return flightService.listAll();
+    public PageRs<FlightRs> listAll(
+            @RequestParam(name = "page", required = false) Integer page,
+            @RequestParam(name = "size", required = false) Integer size,
+            @RequestParam(name = "sort", required = false) String sort
+    ) {
+        return flightService.listAll(page, size, sort);
     }
 
     @GetMapping("/filter")
-    public List<FlightRs> filter(
+    public PageRs<FlightRs> filter(
             @RequestParam(name = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "airline", required = false) Integer airline,
             @RequestParam(name = "direction", required = false) String direction,
             @RequestParam(name = "origin", required = false) String origin,
-            @RequestParam(name = "destination", required = false) String destination
+            @RequestParam(name = "destination", required = false) String destination,
+            @RequestParam(name = "terminal", required = false) String terminal,
+            @RequestParam(name = "hourFrom", required = false) Integer hourFrom,
+            @RequestParam(name = "page", required = false) Integer page,
+            @RequestParam(name = "size", required = false) Integer size,
+            @RequestParam(name = "sort", required = false) String sort
     ) {
-        return flightService.filter(date, status, airline, direction, origin, destination);
+        return flightService.filter(date, status, airline, direction, origin, destination,
+                terminal, hourFrom, page, size, sort);
     }
 
     @GetMapping("/search")
-    public List<FlightRs> search(
+    public PageRs<FlightRs> search(
             @RequestParam(name = "query") String query,
             @RequestParam(name = "date", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -66,9 +77,15 @@ public class FlightController {
             @RequestParam(name = "airline", required = false) Integer airline,
             @RequestParam(name = "direction", required = false) String direction,
             @RequestParam(name = "origin", required = false) String origin,
-            @RequestParam(name = "destination", required = false) String destination
+            @RequestParam(name = "destination", required = false) String destination,
+            @RequestParam(name = "terminal", required = false) String terminal,
+            @RequestParam(name = "hourFrom", required = false) Integer hourFrom,
+            @RequestParam(name = "page", required = false) Integer page,
+            @RequestParam(name = "size", required = false) Integer size,
+            @RequestParam(name = "sort", required = false) String sort
     ) {
-        return flightService.search(query, date, status, airline, direction, origin, destination);
+        return flightService.search(query, date, status, airline, direction, origin, destination,
+                terminal, hourFrom, page, size, sort);
     }
 
     @GetMapping("/{id}")

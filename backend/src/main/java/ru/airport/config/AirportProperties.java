@@ -14,6 +14,10 @@ public class AirportProperties {
 
     private String homeIata = "SVO";
     private String timezone = "Europe/Moscow";
+    /** Окно ±N часов вокруг планового вылета/прилёта для интервала гейта. */
+    private int gatePlanWindowHours = 12;
+    /** Минуты после assigned_to, в которые допустим факт вылета/прилёта у гейта. */
+    private int gatePostGraceMinutes = 15;
     private Scheduler scheduler = new Scheduler();
 
     @Getter

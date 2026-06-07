@@ -17,6 +17,22 @@ body {
   flex-direction: column;
 }
 
+.airport-config-gate {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.airport-config-gate__detail {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .board-header {
   display: flex;
   align-items: center;
@@ -129,6 +145,13 @@ body {
   cursor: not-allowed;
 }
 
+.filter-bar__hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .board-main {
   flex: 1;
   padding: 24px 32px 40px;
@@ -203,3 +226,47 @@ body {
   font-weight: 600;
   font-size: 17px;
 }
+
+.cell-date {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 32px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pagination-bar__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-bar__page {
+  min-width: 4rem;
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+
+.status-badge--scheduled { background: #3b82f6; }
+.status-badge--departed { background: #f97316; }
+.status-badge--arrived { background: #22c55e; }
+.status-badge--delayed { background: #ef4444; }
+.status-badge--cancelled { background: #6b7280; }

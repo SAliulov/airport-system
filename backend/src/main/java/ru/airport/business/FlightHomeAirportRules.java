@@ -9,17 +9,14 @@ import java.time.LocalDateTime;
 /**
  * Правила домашнего аэропорта (АОС): направление рейса и инварианты перехода в DEPARTED/ARRIVED.
  */
-public final class FlightHomeAirportRules {
+public class FlightHomeAirportRules {
 
     public enum OperationKind {
         DEPARTURE,
         ARRIVAL
     }
 
-    private FlightHomeAirportRules() {
-    }
-
-    public static OperationKind resolveOperationKind(Schedule schedule, String homeIata) {
+    public OperationKind resolveOperationKind(Schedule schedule, String homeIata) {
         String home = normalize(homeIata);
         String origin = normalize(schedule.getOriginAirport());
         String destination = normalize(schedule.getDestinationAirport());
@@ -35,11 +32,11 @@ public final class FlightHomeAirportRules {
     }
 
     /** Маршрут должен проходить через базовый аэропорт ровно на одном конце (вылет или прилёт). */
-    public static void assertValidHomeRoute(Schedule schedule, String homeIata) {
+    public void assertValidHomeRoute(Schedule schedule, String homeIata) {
         resolveOperationKind(schedule, homeIata);
     }
 
-    public static void assertManualTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+    public void assertManualTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
         touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.DEPARTURE) {
@@ -49,7 +46,7 @@ public final class FlightHomeAirportRules {
         assertHomeDepartureRequirements(flight, actualDeparture);
     }
 
-    public static void assertManualInboundDeparture(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+    public void assertManualInboundDeparture(Flight flight, String homeIata, LocalDateTime actualDeparture) {
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.ARRIVAL) {
             throw new BadRequestException(
@@ -60,7 +57,7 @@ public final class FlightHomeAirportRules {
     }
 
     /** Прилёт в базовый аэропорт (origin → SVO). */
-    public static void assertManualTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
+    public void assertManualTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
         touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.ARRIVAL) {
@@ -71,7 +68,7 @@ public final class FlightHomeAirportRules {
     }
 
     /** Прилёт в пункт назначения (SVO → dest), без гейта в SVO. */
-    public static void assertManualRemoteArrival(Flight flight, String homeIata, LocalDateTime actualArrival) {
+    public void assertManualRemoteArrival(Flight flight, String homeIata, LocalDateTime actualArrival) {
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.DEPARTURE) {
             throw new BadRequestException(
@@ -81,7 +78,7 @@ public final class FlightHomeAirportRules {
         assertAircraftTypeAssigned(flight);
     }
 
-    public static void assertAutoTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+    public void assertAutoTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
         touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind == OperationKind.DEPARTURE) {
@@ -91,7 +88,7 @@ public final class FlightHomeAirportRules {
         assertActualDeparturePresent(actualDeparture);
     }
 
-    public static void assertAutoTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
+    public void assertAutoTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
         touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind == OperationKind.ARRIVAL) {
@@ -103,7 +100,7 @@ public final class FlightHomeAirportRules {
         }
     }
 
-    private static void assertHomeDepartureRequirements(Flight flight, LocalDateTime actualDeparture) {
+    private void assertHomeDepartureRequirements(Flight flight, LocalDateTime actualDeparture) {
         assertActualDeparturePresent(actualDeparture);
         assertAircraftTypeAssigned(flight);
         if (flight.getActiveGateAssignment() == null) {
@@ -112,7 +109,7 @@ public final class FlightHomeAirportRules {
         }
     }
 
-    private static void assertHomeArrivalRequirements(Flight flight, LocalDateTime actualArrival) {
+    private void assertHomeArrivalRequirements(Flight flight, LocalDateTime actualArrival) {
         assertActualArrivalPresent(actualArrival);
         assertAircraftTypeAssigned(flight);
         if (flight.getActiveGateAssignment() == null) {
@@ -121,27 +118,27 @@ public final class FlightHomeAirportRules {
         }
     }
 
-    private static void assertAircraftTypeAssigned(Flight flight) {
+    private void assertAircraftTypeAssigned(Flight flight) {
         if (flight.getAircraftType() == null) {
             throw new BadRequestException("Необходимо назначить тип воздушного судна");
         }
     }
 
-    private static void assertActualDeparturePresent(LocalDateTime actualDeparture) {
+    private void assertActualDeparturePresent(LocalDateTime actualDeparture) {
         if (actualDeparture == null) {
             throw new BadRequestException(
                     "Для перевода в статус DEPARTED необходимо фактическое время вылета (actualDeparture)");
         }
     }
 
-    private static void assertActualArrivalPresent(LocalDateTime actualArrival) {
+    private void assertActualArrivalPresent(LocalDateTime actualArrival) {
         if (actualArrival == null) {
             throw new BadRequestException(
                     "Для перевода в статус ARRIVED необходимо фактическое время прилёта (actualArrival)");
         }
     }
 
-    private static void touchGateAssignments(Flight flight) {
+    private void touchGateAssignments(Flight flight) {
         if (flight.getGateAssignments() != null) {
             flight.getGateAssignments().size();
         }

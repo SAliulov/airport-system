@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../config.dart';
+import '../mappers/realtime_event_mapper.dart';
 import '../models/operational_event.dart';
 import '../models/realtime_event.dart';
 
@@ -99,8 +100,12 @@ class StompService {
       for (final cb in _operationalListeners) {
         cb(event);
       }
-    } catch (_) {
-      // ignore malformed payload
+    } catch (e) {
+      assert(() {
+        // ignore: avoid_print
+        print('operational-events parse error: $e body=${frame.body}');
+        return true;
+      }());
     }
   }
 
@@ -108,58 +113,27 @@ class StompService {
     if (frame.body == null) return;
     try {
       final json = jsonDecode(frame.body!) as Map<String, dynamic>;
-      final flightId = json['flightId'] as int? ?? 0;
-      final w = json['warning'] as Map<String, dynamic>? ?? {};
-      final minutes = w['delayMinutes'] ?? 0;
-      final reason = w['reason']?.toString() ?? '';
-
-      _emit(RealtimeEvent(
-        type: EventType.delay,
-        flightId: flightId,
-        title: 'Задержка рейса #$flightId',
-        subtitle: '$minutes мин${reason.isNotEmpty ? ': $reason' : ''}',
-      ));
-    } catch (_) {
-      // ignore malformed payload
-    }
+      final event = RealtimeEventMapper.fromDelayJson(json);
+      if (event != null) _emit(event);
+    } catch (_) {}
   }
 
   void _onGateChange(StompFrame frame) {
     if (frame.body == null) return;
     try {
       final json = jsonDecode(frame.body!) as Map<String, dynamic>;
-      final flightId = json['flightId'] as int? ?? 0;
-      final a = json['assignment'] as Map<String, dynamic>? ?? {};
-      final gate = a['gate'] as Map<String, dynamic>?;
-      final gateNum = gate?['gateNumber']?.toString() ?? '?';
-
-      _emit(RealtimeEvent(
-        type: EventType.gateChange,
-        flightId: flightId,
-        title: 'Смена гейта рейса #$flightId',
-        subtitle: 'Новый гейт: $gateNum',
-      ));
-    } catch (_) {
-      // ignore malformed payload
-    }
+      final event = RealtimeEventMapper.fromGateChangeJson(json);
+      if (event != null) _emit(event);
+    } catch (_) {}
   }
 
   void _onFlightUpdate(StompFrame frame) {
     if (frame.body == null) return;
     try {
       final json = jsonDecode(frame.body!) as Map<String, dynamic>;
-      final flightId = json['flightId'] as int? ?? 0;
-      final status = json['status']?.toString() ?? '';
-
-      _emit(RealtimeEvent(
-        type: EventType.flightUpdate,
-        flightId: flightId,
-        title: 'Статус рейса #$flightId',
-        subtitle: status,
-      ));
-    } catch (_) {
-      // ignore malformed payload
-    }
+      final event = RealtimeEventMapper.fromFlightUpdateJson(json);
+      if (event != null) _emit(event);
+    } catch (_) {}
   }
 
   void _emit(RealtimeEvent e) {

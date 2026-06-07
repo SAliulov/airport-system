@@ -42,6 +42,10 @@ import java.util.Map;
  * PDF: кириллица через {@code /fonts/NotoSans-Regular.ttf}; без файла — подстановка «?» для не-ASCII.
  * Требуется роль DISPATCHER (JWT Bearer); без заголовка Authorization — 401.
  */
+/**
+ * Экспорт операционного расписания на дату в PDF и Excel (только DISPATCHER).
+ * Строки строятся из шаблонов с экземплярами flight на выбранный день.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

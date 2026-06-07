@@ -25,6 +25,7 @@ import ru.airport.repository.FlightSpecifications;
 import ru.airport.repository.ScheduleRepository;
 import ru.airport.validation.FlightStatusParser;
 import ru.airport.validation.TextNormalization;
+import ru.airport.service.schedule.ScheduleDraftMapper;
 import ru.airport.websocket.RealtimeNotificationService;
 
 import java.time.LocalDate;
@@ -49,6 +50,7 @@ public class ScheduleService {
     private final ScheduleBusinessRules scheduleBusinessRules;
     private final ScheduleSlotBusinessRules scheduleSlotBusinessRules;
     private final SchedulePeriodicityBusinessRules periodicityRules;
+    private final FlightHomeAirportRules flightHomeAirportRules;
     private final AirportProperties airportProperties;
     private final AirportClock airportClock;
     private final RealtimeNotificationService realtimeNotificationService;
@@ -137,7 +139,7 @@ public class ScheduleService {
             LocalDateTime end = airportClock.startOfNextDay(date);
             if (status != null) {
                 List<Flight> flights = flightRepository.findAll(
-                        FlightSpecifications.forApiList(start, end, status, null, null));
+                        FlightSpecifications.forApiList(start, end, status, null, null, null, null, null));
                 return distinctSchedules(flights.stream().map(Flight::getSchedule).toList());
             }
             return scheduleRepository.findAllActiveWithSlots().stream()
@@ -163,7 +165,7 @@ public class ScheduleService {
     }
 
     public ScheduleRs getById(Integer id) {
-        return mapper.toScheduleRs(loadSchedule(id));
+        return enrichScheduleRs(mapper.toScheduleRs(loadSchedule(id)));
     }
 
     @Transactional
@@ -174,10 +176,10 @@ public class ScheduleService {
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
         Schedule draft = mapper.newSchedule(rq, airline);
-        scheduleSlotBusinessRules.assertValidSlots(draft, rq.getSlots());
-        FlightHomeAirportRules.assertValidHomeRoute(draft, homeIata());
+        scheduleSlotBusinessRules.assertValidSlots(draft, ScheduleDraftMapper.slotsFrom(rq.getSlots()));
+        flightHomeAirportRules.assertValidHomeRoute(draft, homeIata());
         Schedule saved = scheduleRepository.save(draft);
-        return mapper.toScheduleRs(saved);
+        return enrichScheduleRs(mapper.toScheduleRs(saved));
     }
 
     @Transactional
@@ -185,16 +187,16 @@ public class ScheduleService {
         TextNormalization.normalizeScheduleAirports(rq);
         Schedule existing = loadSchedule(id);
         List<Flight> linkedFlights = flightRepository.findBySchedule_ScheduleId(id);
-        scheduleBusinessRules.assertMayUpdate(existing, rq, linkedFlights);
+        scheduleBusinessRules.assertMayUpdate(existing, ScheduleDraftMapper.from(rq), linkedFlights);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
         mapper.applyFields(rq, existing, airline);
         mapper.mergeSlots(rq.getSlots(), existing, flightRepository::existsBySlot_SlotId);
-        scheduleSlotBusinessRules.assertValidSlots(existing, rq.getSlots());
-        FlightHomeAirportRules.assertValidHomeRoute(existing, homeIata());
+        scheduleSlotBusinessRules.assertValidSlots(existing, ScheduleDraftMapper.slotsFrom(rq.getSlots()));
+        flightHomeAirportRules.assertValidHomeRoute(existing, homeIata());
         Schedule saved = scheduleRepository.save(existing);
         publishLinkedFlights(linkedFlights);
-        return mapper.toScheduleRs(saved);
+        return enrichScheduleRs(mapper.toScheduleRs(saved));
     }
 
     @Transactional
@@ -227,5 +229,25 @@ public class ScheduleService {
         return scheduleRepository.findByIdWithSlots(id).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", id));
+    }
+
+    private ScheduleRs enrichScheduleRs(ScheduleRs rs) {
+        if (rs == null) {
+            return null;
+        }
+        rs.setReactivationSuggested(shouldSuggestReactivation(rs));
+        return rs;
+    }
+
+    private boolean shouldSuggestReactivation(ScheduleRs rs) {
+        if (Boolean.TRUE.equals(rs.getIsActive())) {
+            return false;
+        }
+        LocalDate effectiveTo = rs.getEffectiveTo();
+        if (effectiveTo == null) {
+            return false;
+        }
+        LocalDate today = airportClock.now().toLocalDate();
+        return !effectiveTo.isBefore(today);
     }
 }

@@ -67,6 +67,8 @@ export interface ScheduleRs {
   /** При фильтрации по дате — вычисленные времена на этот день. */
   departureAtDate?: string;
   arrivalAtDate?: string;
+  /** UI-hint: период в будущем, но шаблон выключен. */
+  reactivationSuggested?: boolean;
 }
 
 export interface FlightRs {
@@ -84,18 +86,6 @@ export interface FlightRs {
   delayWarnings?: DelayWarningRs[];
 }
 
-export interface FlightGenerateRq {
-  fromDate: string;
-  toDate: string;
-  scheduleId?: number;
-}
-
-export interface FlightGenerateRs {
-  created: number;
-  skipped: number;
-  flightIds: number[];
-}
-
 export interface GateTimelineSegmentRs {
   gateId: number;
   gateNumber: string;
@@ -105,6 +95,14 @@ export interface GateTimelineSegmentRs {
   flightStatus?: FlightStatus;
   assignedFrom: string;
   assignedTo: string;
+}
+
+export interface PageRs<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 export interface LoginRs {

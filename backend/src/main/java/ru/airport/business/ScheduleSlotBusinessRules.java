@@ -1,6 +1,6 @@
 package ru.airport.business;
 
-import ru.airport.dto.ScheduleSlotRq;
+import ru.airport.business.schedule.ScheduleSlotDraft;
 import ru.airport.exception.BadRequestException;
 import ru.airport.model.PeriodicityType;
 import ru.airport.model.Schedule;
@@ -22,7 +22,7 @@ public class ScheduleSlotBusinessRules {
         this.occurrenceRules = occurrenceRules;
     }
 
-    public void assertValidSlots(Schedule schedule, List<ScheduleSlotRq> slots) {
+    public void assertValidSlots(Schedule schedule, List<ScheduleSlotDraft> slots) {
         if (slots == null || slots.isEmpty()) {
             throw new BadRequestException("Укажите хотя бы один слот расписания");
         }
@@ -31,25 +31,25 @@ public class ScheduleSlotBusinessRules {
             if (slots.size() != 1) {
                 throw new BadRequestException("Для INTERVAL допускается ровно один слот без дня недели");
             }
-            ScheduleSlotRq slot = slots.getFirst();
-            if (slot.getDayOfWeek() != null) {
+            ScheduleSlotDraft slot = slots.getFirst();
+            if (slot.dayOfWeek() != null) {
                 throw new BadRequestException("Для INTERVAL день недели слота должен быть пустым");
             }
-            occurrenceRules.assertValidSlotTimes(slot.getDepartureTime(), slot.getArrivalTime());
+            occurrenceRules.assertValidSlotTimes(slot.departureTime(), slot.arrivalTime());
             assertSlotFitsEffectivePeriod(schedule, null);
             return;
         }
 
         Set<Integer> seenDow = new HashSet<>();
-        for (ScheduleSlotRq slot : slots) {
-            Integer dow = slot.getDayOfWeek();
+        for (ScheduleSlotDraft slot : slots) {
+            Integer dow = slot.dayOfWeek();
             if (dow == null || dow < 1 || dow > 7) {
                 throw new BadRequestException("Для WEEKLY укажите день недели слота от 1 (Пн) до 7 (Вс)");
             }
             if (!seenDow.add(dow)) {
                 throw new BadRequestException("День недели %d указан более одного раза".formatted(dow));
             }
-            occurrenceRules.assertValidSlotTimes(slot.getDepartureTime(), slot.getArrivalTime());
+            occurrenceRules.assertValidSlotTimes(slot.departureTime(), slot.arrivalTime());
             assertSlotFitsEffectivePeriod(schedule, dow);
         }
     }
@@ -60,12 +60,22 @@ public class ScheduleSlotBusinessRules {
     public void assertSlotFitsEffectivePeriod(Schedule schedule, Integer dayOfWeek) {
         LocalDate effectiveFrom = schedule.getEffectiveFrom();
         LocalDate effectiveTo = schedule.getEffectiveTo();
-        if (effectiveFrom == null || effectiveTo == null) {
+        if (effectiveFrom == null) {
             return;
         }
 
         PeriodicityType type = schedule.getPeriodicityType();
         int step = schedule.getPeriodicityStep() != null ? schedule.getPeriodicityStep() : 1;
+
+        if (effectiveTo == null) {
+            if (type == PeriodicityType.WEEKLY && dayOfWeek != null
+                    && effectiveFrom.getDayOfWeek().getValue() != dayOfWeek) {
+                throw new BadRequestException(
+                        "Слот для дня недели %d не совпадает с датой начала действия шаблона (%s)"
+                                .formatted(dayOfWeek, effectiveFrom));
+            }
+            return;
+        }
 
         if (type == PeriodicityType.WEEKLY) {
             if (dayOfWeek == null) {

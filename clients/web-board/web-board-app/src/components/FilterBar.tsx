@@ -1,52 +1,43 @@
-import type { AirlineRs } from '../types';
-
-export type DatePreset = 'today' | 'all' | '7d' | '30d';
+import type { AirlineRs, FlightStatus } from '../types';
+import {
+  DAY_PRESETS,
+  FILTER_STATUSES,
+  STATUS_LABELS,
+  TIME_SLOTS,
+  type BoardFilterState,
+} from '../constants/boardFilters';
 
 interface Props {
-  date: string;
-  datePreset: DatePreset;
-  origin: string;
-  destination: string;
-  airlineId: string;
+  filters: BoardFilterState;
   airlines: AirlineRs[];
-  onDatePresetChange: (preset: DatePreset) => void;
-  onDateChange: (value: string) => void;
-  onOriginChange: (value: string) => void;
-  onDestinationChange: (value: string) => void;
-  onAirlineChange: (value: string) => void;
+  terminals: string[];
+  homeIata: string;
+  onChange: (patch: Partial<BoardFilterState>) => void;
 }
 
-const PRESETS: { id: DatePreset; label: string }[] = [
-  { id: 'today', label: 'Сегодня' },
-  { id: 'all', label: 'Все даты' },
-  { id: '7d', label: '7 дней' },
-  { id: '30d', label: '30 дней' },
-];
+function isFlightStatus(value: string): value is FlightStatus {
+  return (FILTER_STATUSES as string[]).includes(value);
+}
 
-export function FilterBar({
-  date,
-  datePreset,
-  origin,
-  destination,
-  airlineId,
-  airlines,
-  onDatePresetChange,
-  onDateChange,
-  onOriginChange,
-  onDestinationChange,
-  onAirlineChange,
-}: Props) {
+/** Панель фильтров табло. */
+export function FilterBar({ filters, airlines, terminals, homeIata, onChange }: Props) {
+  const iataHint =
+    (filters.origin.length > 0 && filters.origin.length !== 3)
+    || (filters.destination.length > 0 && filters.destination.length !== 3)
+      ? 'Для фильтра по маршруту укажите 3 буквы IATA'
+      : null;
+
   return (
     <div className="filter-bar">
       <div className="filter-bar__presets">
-        <span className="filter-bar__group-label">Период</span>
+        <span className="filter-bar__group-label">День</span>
         <div className="filter-bar__preset-buttons">
-          {PRESETS.map(p => (
+          {DAY_PRESETS.map(p => (
             <button
               key={p.id}
               type="button"
-              className={datePreset === p.id ? 'preset-btn preset-btn--active' : 'preset-btn'}
-              onClick={() => onDatePresetChange(p.id)}
+              className={filters.dayPreset === p.id ? 'preset-btn preset-btn--active' : 'preset-btn'}
+              onClick={() => onChange({ dayPreset: p.id })}
             >
               {p.label}
             </button>
@@ -54,25 +45,64 @@ export function FilterBar({
         </div>
       </div>
       <label>
-        <span>Дата (точная)</span>
-        <input
-          type="date"
-          value={date}
-          disabled={datePreset === '7d' || datePreset === '30d'}
+        <span>Время (MSK)</span>
+        <select
+          value={filters.hourFrom ?? ''}
           onChange={e => {
-            onDateChange(e.target.value);
-            if (e.target.value) onDatePresetChange('today');
+            const v = e.target.value;
+            onChange({ hourFrom: v === '' ? null : Number(v) });
           }}
+        >
+          {TIME_SLOTS.map(slot => (
+            <option key={slot.label} value={slot.hourFrom ?? ''}>
+              {slot.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Терминал</span>
+        <select value={filters.terminal} onChange={e => onChange({ terminal: e.target.value })}>
+          <option value="">Все терминалы</option>
+          {terminals.map(t => (
+            <option key={t} value={t}>
+              Терминал {t}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Поиск по номеру</span>
+        <input
+          type="search"
+          placeholder="SU100…"
+          value={filters.search}
+          onChange={e => onChange({ search: e.target.value.toUpperCase() })}
         />
+      </label>
+      <label>
+        <span>Статус</span>
+        <select
+          value={filters.status}
+          onChange={e => {
+            const v = e.target.value;
+            onChange({ status: v === '' || isFlightStatus(v) ? v : '' });
+          }}
+        >
+          <option value="">Все</option>
+          {FILTER_STATUSES.map(s => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </select>
       </label>
       <label>
         <span>Откуда (IATA)</span>
         <input
           type="text"
           maxLength={3}
-          placeholder="SVO"
-          value={origin}
-          onChange={e => onOriginChange(e.target.value.toUpperCase())}
+          placeholder={homeIata}
+          value={filters.origin}
+          onChange={e => onChange({ origin: e.target.value.toUpperCase() })}
         />
       </label>
       <label>
@@ -81,13 +111,13 @@ export function FilterBar({
           type="text"
           maxLength={3}
           placeholder="LED"
-          value={destination}
-          onChange={e => onDestinationChange(e.target.value.toUpperCase())}
+          value={filters.destination}
+          onChange={e => onChange({ destination: e.target.value.toUpperCase() })}
         />
       </label>
       <label>
         <span>Авиакомпания</span>
-        <select value={airlineId} onChange={e => onAirlineChange(e.target.value)}>
+        <select value={filters.airlineId} onChange={e => onChange({ airlineId: e.target.value })}>
           <option value="">Все</option>
           {airlines.map(a => (
             <option key={a.airlineId} value={String(a.airlineId)}>
@@ -96,6 +126,9 @@ export function FilterBar({
           ))}
         </select>
       </label>
+      {iataHint && <p className="filter-bar__hint">{iataHint}</p>}
     </div>
   );
 }
+
+export type { DayPreset } from '../constants/boardFilters';

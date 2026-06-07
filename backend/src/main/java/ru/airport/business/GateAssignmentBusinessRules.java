@@ -1,5 +1,6 @@
 package ru.airport.business;
 
+import ru.airport.exception.BadRequestException;
 import ru.airport.exception.ConflictException;
 import ru.airport.model.AircraftType;
 import ru.airport.model.Gate;
@@ -14,10 +15,66 @@ import java.util.List;
  */
 public class GateAssignmentBusinessRules {
 
+    private final int planWindowHours;
+    private final int postGraceMinutes;
+
+    public GateAssignmentBusinessRules(int planWindowHours, int postGraceMinutes) {
+        this.planWindowHours = planWindowHours;
+        this.postGraceMinutes = postGraceMinutes;
+    }
+
     public void assertValidInterval(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null || !from.isBefore(to)) {
             throw new ConflictException(
                     "Интервал назначения гейта некорректен: assigned_from должен быть строго раньше assigned_to");
+        }
+    }
+
+    /**
+     * Интервал гейта должен пересекаться с окном ±planWindowHours вокруг планового якоря рейса.
+     */
+    public void assertIntervalOverlapsScheduledWindow(
+            LocalDateTime assignedFrom,
+            LocalDateTime assignedTo,
+            LocalDateTime scheduledAnchor) {
+        if (scheduledAnchor == null) {
+            return;
+        }
+        LocalDateTime windowStart = scheduledAnchor.minusHours(planWindowHours);
+        LocalDateTime windowEnd = scheduledAnchor.plusHours(planWindowHours);
+        boolean overlaps = assignedFrom.isBefore(windowEnd) && assignedTo.isAfter(windowStart);
+        if (!overlaps) {
+            throw new BadRequestException(
+                    "Интервал гейта должен пересекаться с плановым временем рейса (±" + planWindowHours + " ч)");
+        }
+    }
+
+    /**
+     * Фактическое время вылета/прилёта должно быть после начала занятости гейта
+     * и не позже assigned_to + postGrace.
+     */
+    public void assertActualTimeWithinGateInterval(
+            LocalDateTime actualTime,
+            GateAssignment assignment,
+            String label) {
+        if (actualTime == null || assignment == null) {
+            return;
+        }
+        LocalDateTime from = assignment.getAssignedFrom();
+        LocalDateTime to = assignment.getAssignedTo();
+        if (from == null || to == null) {
+            return;
+        }
+        LocalDateTime maxAllowed = to.plusMinutes(postGraceMinutes);
+        if (!actualTime.isAfter(from)) {
+            throw new BadRequestException(
+                    "Фактическое время " + label + " не может быть раньше начала занятости гейта ("
+                            + from + ")");
+        }
+        if (actualTime.isAfter(maxAllowed)) {
+            throw new BadRequestException(
+                    "Фактическое время " + label + " не может быть позже окончания занятости гейта более чем на "
+                            + postGraceMinutes + " мин");
         }
     }
 

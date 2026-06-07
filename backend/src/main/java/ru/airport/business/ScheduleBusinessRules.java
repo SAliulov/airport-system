@@ -1,6 +1,6 @@
 package ru.airport.business;
 
-import ru.airport.dto.ScheduleRq;
+import ru.airport.business.schedule.ScheduleDraft;
 import ru.airport.exception.BadRequestException;
 import ru.airport.exception.ConflictException;
 import ru.airport.model.Flight;
@@ -47,15 +47,15 @@ public class ScheduleBusinessRules {
     /**
      * SCHEDULED/DELAYED — можно менять маршрут и слоты; при DEPARTED/ARRIVED/CANCELLED — только номер и АК.
      */
-    public void assertMayUpdate(Schedule existing, ScheduleRq rq, List<Flight> linkedFlights) {
-        assertValidEffectiveRange(rq.getEffectiveFrom(), rq.getEffectiveTo());
-        assertValidPeriodicity(rq.getPeriodicityType(), rq.getPeriodicityStep());
+    public void assertMayUpdate(Schedule existing, ScheduleDraft draft, List<Flight> linkedFlights) {
+        assertValidEffectiveRange(draft.effectiveFrom(), draft.effectiveTo());
+        assertValidPeriodicity(draft.periodicityType(), draft.periodicityStep());
 
-        if (Boolean.FALSE.equals(rq.getIsActive())
+        if (Boolean.FALSE.equals(draft.isActive())
                 && Boolean.TRUE.equals(existing.getIsActive())
-                && !linkedFlights.isEmpty()) {
+                && hasOpenOperationalFlight(linkedFlights)) {
             throw new ConflictException(
-                    "Нельзя деактивировать шаблон: по нему уже созданы рейсы. Удалите рейсы или оставьте шаблон активным.");
+                    "Нельзя деактивировать шаблон: есть рейсы в статусе SCHEDULED, DEPARTED или DELAYED.");
         }
 
         boolean hasClosedFlight = linkedFlights.stream()
@@ -65,7 +65,7 @@ public class ScheduleBusinessRules {
             return;
         }
 
-        if (routeOrTemplateChanged(existing, rq)) {
+        if (routeOrTemplateChanged(existing, draft)) {
             throw new ConflictException(ROUTE_LOCKED_MESSAGE);
         }
     }
@@ -76,13 +76,49 @@ public class ScheduleBusinessRules {
                 || status == FlightStatus.CANCELLED;
     }
 
-    private static boolean routeOrTemplateChanged(Schedule existing, ScheduleRq rq) {
-        return !Objects.equals(normalize(existing.getOriginAirport()), normalize(rq.getOriginAirport()))
-                || !Objects.equals(normalize(existing.getDestinationAirport()), normalize(rq.getDestinationAirport()))
-                || !Objects.equals(existing.getEffectiveFrom(), rq.getEffectiveFrom())
-                || !Objects.equals(existing.getEffectiveTo(), rq.getEffectiveTo())
-                || existing.getPeriodicityType() != rq.getPeriodicityType()
-                || !Objects.equals(existing.getPeriodicityStep(), rq.getPeriodicityStep());
+    private boolean hasOpenOperationalFlight(List<Flight> linkedFlights) {
+        return linkedFlights.stream()
+                .map(Flight::getStatus)
+                .anyMatch(this::isOpenOperationalStatus);
+    }
+
+    private boolean isOpenOperationalStatus(FlightStatus status) {
+        return status == FlightStatus.SCHEDULED
+                || status == FlightStatus.DEPARTED
+                || status == FlightStatus.DELAYED;
+    }
+
+    private static boolean routeOrTemplateChanged(Schedule existing, ScheduleDraft draft) {
+        if (!Objects.equals(normalize(existing.getOriginAirport()), normalize(draft.originAirport()))) {
+            return true;
+        }
+        if (!Objects.equals(normalize(existing.getDestinationAirport()), normalize(draft.destinationAirport()))) {
+            return true;
+        }
+        if (!Objects.equals(existing.getEffectiveFrom(), draft.effectiveFrom())) {
+            return true;
+        }
+        if (existing.getPeriodicityType() != draft.periodicityType()) {
+            return true;
+        }
+        if (!Objects.equals(existing.getPeriodicityStep(), draft.periodicityStep())) {
+            return true;
+        }
+        return effectiveToShortened(existing.getEffectiveTo(), draft.effectiveTo());
+    }
+
+    /** Запрещено только сокращение периода действия; удлинение effectiveTo допустимо. */
+    private static boolean effectiveToShortened(LocalDate existingTo, LocalDate requestedTo) {
+        if (Objects.equals(existingTo, requestedTo)) {
+            return false;
+        }
+        if (existingTo == null) {
+            return false;
+        }
+        if (requestedTo == null) {
+            return false;
+        }
+        return requestedTo.isBefore(existingTo);
     }
 
     private static String normalize(String code) {

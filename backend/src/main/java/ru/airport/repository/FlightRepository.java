@@ -62,6 +62,17 @@ public interface FlightRepository extends JpaRepository<Flight, Integer>, JpaSpe
     @Query("""
             SELECT DISTINCT f FROM Flight f
             JOIN FETCH f.schedule s
+            JOIN FETCH f.slot sl
+            LEFT JOIN FETCH f.aircraftType
+            LEFT JOIN FETCH f.gateAssignments ga
+            LEFT JOIN FETCH ga.gate
+            WHERE f.flightId = :flightId
+            """)
+    Optional<Flight> findByIdForDetail(@Param("flightId") Integer flightId);
+
+    @Query("""
+            SELECT DISTINCT f FROM Flight f
+            JOIN FETCH f.schedule s
             JOIN FETCH s.airline a
             JOIN FETCH f.slot sl
             LEFT JOIN FETCH f.aircraftType

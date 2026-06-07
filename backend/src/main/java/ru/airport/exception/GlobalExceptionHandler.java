@@ -43,6 +43,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(Map.of("error", message));
     }
 
+    // --- Domain (business layer) ---
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Map<String, String>> badRequest(BadRequestException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
@@ -70,6 +72,8 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT,
                 "Нельзя изменить данные: есть связанные записи (например, рейсы по слоту расписания)");
     }
+
+    // --- Bean Validation / binding ---
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> validation(MethodArgumentNotValidException ex) {
@@ -129,6 +133,8 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, msg);
     }
 
+    // --- Security ---
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> badCredentials(BadCredentialsException ex) {
         log.debug("Authentication failed: {}", ex.getMessage());
@@ -153,6 +159,27 @@ public class GlobalExceptionHandler {
             msg = "Доступ запрещён";
         }
         return error(HttpStatus.FORBIDDEN, msg);
+    }
+
+    // --- Illegal state / fallback ---
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> illegalArgument(IllegalArgumentException ex) {
+        String msg = ex.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = "Некорректный запрос";
+        }
+        return error(HttpStatus.BAD_REQUEST, msg);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> illegalState(IllegalStateException ex) {
+        log.debug("Illegal state: {}", ex.getMessage());
+        String msg = ex.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = "Операция недоступна в текущем состоянии";
+        }
+        return error(HttpStatus.BAD_REQUEST, msg);
     }
 
     @ExceptionHandler(Exception.class)

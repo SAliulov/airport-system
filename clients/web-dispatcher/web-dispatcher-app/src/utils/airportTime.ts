@@ -1,53 +1,23 @@
-/** Wall-clock times for the home airport (must match backend airport.timezone). */
+export {
+  formatAirportDateTime,
+  formatAirportTime,
+  naiveWallMs,
+  parseNaiveWall,
+  scheduleDepartureDate,
+  todayAirportDate,
+  todayAirportDateInTz,
+} from '../../../../shared/utils/airportTime';
 
-export const AIRPORT_TZ = 'Europe/Moscow';
+export {
+  getAirportRuntime,
+  getAirportTimezone,
+  getGatePlanWindowHours,
+  getGatePostGraceMinutes,
+  getHomeIata,
+} from '../../../../shared/utils/airportRuntime';
 
 const NAIVE_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/;
 const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
-
-/** Сегодня в календаре аэропорта (YYYY-MM-DD для input[type=date]). */
-export function todayAirportDate(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: AIRPORT_TZ }).format(new Date());
-}
-
-/** Календарный день планового вылета из API naive datetime. */
-export function scheduleDepartureDate(scheduledDeparture?: string | null): string | null {
-  if (!scheduledDeparture) return null;
-  const wall = parseNaiveWall(scheduledDeparture);
-  if (wall) return `${wall.y}-${wall.mo}-${wall.d}`;
-  const normalized = scheduledDeparture.includes('T')
-    ? scheduledDeparture
-    : scheduledDeparture.replace(' ', 'T');
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat('en-CA', { timeZone: AIRPORT_TZ }).format(d);
-}
-
-/** Parse API naive local datetime without browser timezone shift. */
-function parseNaiveWall(value: string): { y: string; mo: string; d: string; h: string; mi: string } | null {
-  const match = value.trim().match(NAIVE_DATE_TIME);
-  if (!match) return null;
-  return { y: match[1], mo: match[2], d: match[3], h: match[4], mi: match[5] };
-}
-
-/** Display in tables: 2026-05-19T14:30:00 → 19.05.2026 14:30 */
-export function formatAirportDateTime(value?: string | null): string {
-  if (!value) return '—';
-  const wall = parseNaiveWall(value);
-  if (wall) return `${wall.d}.${wall.mo}.${wall.y} ${wall.h}:${wall.mi}`;
-  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return value.slice(0, 16).replace('T', ' ');
-  return d.toLocaleString('ru-RU', {
-    timeZone: AIRPORT_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).replace(',', '');
-}
 
 /** API ISO/local string → value for input[type=datetime-local] (airport wall time, no TZ shift). */
 export function toDatetimeLocalValue(apiValue?: string | null): string {
@@ -91,12 +61,12 @@ export function isoDayOfWeekLabel(dow?: number | null): string {
   return ISO_DOW_LABELS[dow] ?? String(dow);
 }
 
-/** ISO 1=Пн … 7=Вс для календарной даты YYYY-MM-DD. */
+/** ISO 1=Пн … 7=Вс для календарной даты YYYY-MM-DD (UTC-noon, без сдвига TZ браузера). */
 export function isoDayOfWeekFromDate(date: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const d = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  const js = d.getDay();
+  const [y, mo, d] = date.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
+  const js = utc.getUTCDay();
   return js === 0 ? 7 : js;
 }
 
@@ -110,12 +80,10 @@ export function formatShortDateWithDow(isoDate: string): string {
 }
 
 function addDaysIso(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T12:00:00`);
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const [y, mo, d] = isoDate.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
+  utc.setUTCDate(utc.getUTCDate() + days);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
 }
 
 /** Есть ли в [effectiveFrom…effectiveTo] хотя бы один день с заданным ISO DOW. */
@@ -132,25 +100,4 @@ export function slotDayFitsEffectivePeriod(
     current = addDaysIso(current, 1);
   }
   return false;
-}
-
-/** Time only for tablo and schedule slots (API LocalTime or naive datetime). */
-export function formatAirportTime(value?: string | null): string {
-  if (!value) return '—';
-  const trimmed = value.trim();
-  const timeOnly = trimmed.match(/^(\d{2}):(\d{2})/);
-  if (timeOnly && !trimmed.includes('T') && !/^\d{4}-/.test(trimmed)) {
-    return `${timeOnly[1]}:${timeOnly[2]}`;
-  }
-  const wall = parseNaiveWall(value);
-  if (wall) return `${wall.h}:${wall.mi}`;
-  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleTimeString('ru-RU', {
-    timeZone: AIRPORT_TZ,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
 }

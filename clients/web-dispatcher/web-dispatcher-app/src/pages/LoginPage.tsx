@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAirportConfig } from '../../../../shared/context/AirportConfigProvider';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
@@ -20,6 +21,7 @@ function loginErrorMessage(err: unknown): string {
 }
 
 export default function LoginPage() {
+  const { homeIata } = useAirportConfig();
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -49,7 +51,7 @@ export default function LoginPage() {
           <img src={brandingLogoUrl()} alt="АСУРР" />
         </div>
         <h2>АСУРР</h2>
-        <p className="login-sub">Диспетчерская служба аэропорта Шереметьево</p>
+        <p className="login-sub">Диспетчерская служба аэропорта {homeIata}</p>
         <label>
           Логин
           <input

@@ -1,0 +1,101 @@
+/* Flights page — toolbar, table, edit modal panels */
+
+.flights-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flights-toolbar__iata {
+  width: 110px;
+}
+
+.flights-table {
+  margin-top: 16px;
+}
+
+.flight-status-label {
+  font-weight: 600;
+}
+
+.page-success-banner__close {
+  margin-left: 8px;
+}
+
+.modal-hint--compact {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.modal-hint--tight {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.modal-hint--warning {
+  font-size: 11px;
+  color: #f59e0b;
+  margin-top: 6px;
+}
+
+.panel-section--bordered {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.panel-section__title {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.panel-section__status-line {
+  margin-top: 8px;
+}
+
+.field-block {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.field-block__input {
+  width: 100%;
+}
+
+.gate-current-box {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.gate-current-box__label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.gate-current-box__interval {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.form-row--gate-interval {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-row--delay {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.delay-minutes-input {
+  width: 90px;
+}
+
+.delay-reason-input {
+  flex: 1;
+  min-width: 160px;
+}

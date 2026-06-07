@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
+import '../core/di/app_scope.dart';
 import '../models/operational_event.dart';
-import '../services/airport_api.dart';
-import '../services/stomp_service.dart';
 import '../widgets/operational_event_style.dart';
 import 'flight_detail_screen.dart';
 
 /// Журнал диспетчерских действий (сессия, append-only, локальный поиск).
 class OperationalLogScreen extends StatefulWidget {
-  final AirportApi api;
-  final StompService stomp;
-
-  const OperationalLogScreen({
-    super.key,
-    required this.api,
-    required this.stomp,
-  });
+  const OperationalLogScreen({super.key});
 
   @override
   State<OperationalLogScreen> createState() => _OperationalLogScreenState();
@@ -25,21 +17,31 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   List<OperationalEvent> _filteredLogs = const [];
+  bool _listenerAttached = false;
 
   @override
-  void initState() {
-    super.initState();
-    widget.stomp.addOperationalListener(_onOperationalEvent);
-    widget.stomp.subscribeOperationalEvents();
-    _searchController.addListener(_onSearchChanged);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_listenerAttached) {
+      _listenerAttached = true;
+      AppScope.of(context).stomp.addOperationalListener(_onOperationalEvent);
+    }
   }
 
   @override
   void dispose() {
-    widget.stomp.removeOperationalListener(_onOperationalEvent);
+    if (_listenerAttached) {
+      AppScope.of(context).stomp.removeOperationalListener(_onOperationalEvent);
+    }
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
   }
 
   void _onSearchChanged() {
@@ -69,6 +71,9 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
     if (!mounted) return;
     setState(() {
       _sessionLogs.insert(0, event);
+      if (_sessionLogs.length > 200) {
+        _sessionLogs.removeRange(200, _sessionLogs.length);
+      }
       _recomputeFilteredLogs();
     });
   }
@@ -77,11 +82,11 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Очистить журнал'),
-        content: const Text('Очистить журнал операций?'),
+        title: const Text('Очистить журнал?'),
+        content: const Text('Записи текущей сессии будут удалены с устройства.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Очистить')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Очистить')),
         ],
       ),
     );
@@ -93,10 +98,10 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
     }
   }
 
-  String _formatTime(OperationalEvent e) {
-    final ts = e.timestamp;
-    if (ts.length >= 16) return ts.substring(11, 16);
-    return ts;
+  String _formatTime(OperationalEvent event) {
+    final t = event.timestamp;
+    if (t.length >= 16) return t.substring(11, 16);
+    return t;
   }
 
   @override
@@ -106,24 +111,20 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Журнал операций'),
+        title: const Text('Журнал'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Очистить логи',
-            onPressed: _sessionLogs.isEmpty ? null : _confirmClear,
-          ),
+          IconButton(icon: const Icon(Icons.delete_outline), onPressed: _confirmClear, tooltip: 'Очистить'),
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
+                hintText: 'Поиск по сообщению или пользователю',
                 prefixIcon: const Icon(Icons.search),
-                hintText: 'Поиск по событию или диспетчеру…',
                 border: const OutlineInputBorder(),
                 isDense: true,
                 filled: true,
@@ -147,7 +148,6 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
                     separatorBuilder: (_, index) => const SizedBox(height: 12),
                     itemBuilder: (_, i) => _OperationalLogTile(
                       event: logs[i],
-                      api: widget.api,
                       formatTime: _formatTime,
                     ),
                   ),
@@ -160,12 +160,10 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
 
 class _OperationalLogTile extends StatelessWidget {
   final OperationalEvent event;
-  final AirportApi api;
   final String Function(OperationalEvent) formatTime;
 
   const _OperationalLogTile({
     required this.event,
-    required this.api,
     required this.formatTime,
   });
 
@@ -199,10 +197,7 @@ class _OperationalLogTile extends StatelessWidget {
             ? () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => FlightDetailScreen(
-                      api: api,
-                      flightId: event.flightId!,
-                    ),
+                    builder: (_) => FlightDetailScreen(flightId: event.flightId!),
                   ),
                 );
               }

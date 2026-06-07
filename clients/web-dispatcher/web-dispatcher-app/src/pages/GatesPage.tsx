@@ -119,13 +119,13 @@ export default function GatesPage() {
             <span className="modal-field__error">{fieldErrors.maxSizeCategory}</span>
           )}
         </div>
-        <label className="inline-check">
+        <label className="modal-field__checkbox inline-check">
           <input
             type="checkbox"
             checked={form.isActive}
             onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
           />
-          Активен
+          <span className="modal-field__checkbox-text">Активен</span>
         </label>
         <button className="btn-primary btn-sm" onClick={save}>
           {editing != null ? 'Сохранить' : 'Добавить'}

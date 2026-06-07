@@ -1,5 +1,5 @@
 import type { FlightRs } from '../types';
-import { formatAirportTime } from '../utils/airportTime';
+import { formatAirportTime, formatCompactDate } from '../utils/airportTime';
 import { StatusBadge } from './StatusBadge';
 
 interface Props {
@@ -16,12 +16,14 @@ export function FlightTable({ flights, highlightIds }: Props) {
     <table className="flight-table">
       <thead>
         <tr>
+          <th>Дата</th>
           <th>Рейс</th>
           <th>Откуда</th>
           <th>Куда</th>
           <th>Вылет (план)</th>
           <th>Прилёт (план)</th>
           <th>Вылет (факт)</th>
+          <th>Прилёт (факт)</th>
           <th>Статус</th>
           <th>Гейт</th>
         </tr>
@@ -35,12 +37,15 @@ export function FlightTable({ flights, highlightIds }: Props) {
                 key={f.flightId}
                 className={highlightIds.has(f.flightId) ? 'row-highlight' : ''}
               >
+                <td>—</td>
                 <td className="cell-flight">—</td>
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>
                 <td>—</td>
+                <td>—</td>
                 <td>{formatAirportTime(f.actualDeparture)}</td>
+                <td>{formatAirportTime(f.actualArrival)}</td>
                 <td><StatusBadge status={f.status} /></td>
                 <td className="cell-gate">—</td>
               </tr>
@@ -59,12 +64,14 @@ export function FlightTable({ flights, highlightIds }: Props) {
               key={f.flightId}
               className={highlightIds.has(f.flightId) ? 'row-highlight' : ''}
             >
+              <td className="cell-date">{formatCompactDate(f.operationDate ?? f.scheduledDeparture)}</td>
               <td className="cell-flight">{schedule.flightNumber}</td>
               <td>{schedule.originAirport.trim()}</td>
               <td>{schedule.destinationAirport.trim()}</td>
               <td>{formatAirportTime(f.scheduledDeparture)}</td>
               <td>{formatAirportTime(f.scheduledArrival)}</td>
               <td>{formatAirportTime(f.actualDeparture)}</td>
+              <td>{formatAirportTime(f.actualArrival)}</td>
               <td><StatusBadge status={f.status} /></td>
               <td className="cell-gate">{gateLabel}</td>
             </tr>

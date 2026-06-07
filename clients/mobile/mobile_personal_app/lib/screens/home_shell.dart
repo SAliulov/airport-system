@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import '../services/airport_api.dart';
-import '../services/stomp_service.dart';
+import '../core/di/app_scope.dart';
 import 'flight_lookup_screen.dart';
 import 'operational_log_screen.dart';
 
 /// Оболочка с нижней навигацией: рейсы и журнал операций.
 class HomeShell extends StatefulWidget {
-  final AirportApi api;
-  final StompService stomp;
   final VoidCallback onLogout;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
 
   const HomeShell({
     super.key,
-    required this.api,
-    required this.stomp,
     required this.onLogout,
+    required this.isDarkMode,
+    required this.onToggleTheme,
   });
 
   @override
@@ -23,11 +22,17 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  bool _stompStarted = false;
 
   @override
-  void initState() {
-    super.initState();
-    widget.stomp.connect();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_stompStarted) {
+      _stompStarted = true;
+      final stomp = AppScope.of(context).stomp;
+      stomp.connect();
+      stomp.subscribeOperationalEvents();
+    }
   }
 
   void _onTabSelected(int i) => setState(() => _index = i);
@@ -39,14 +44,11 @@ class _HomeShellState extends State<HomeShell> {
         index: _index,
         children: [
           FlightLookupScreen(
-            api: widget.api,
-            stomp: widget.stomp,
             onLogout: widget.onLogout,
+            isDarkMode: widget.isDarkMode,
+            onToggleTheme: widget.onToggleTheme,
           ),
-          OperationalLogScreen(
-            api: widget.api,
-            stomp: widget.stomp,
-          ),
+          const OperationalLogScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

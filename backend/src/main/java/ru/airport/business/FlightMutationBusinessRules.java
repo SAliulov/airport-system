@@ -30,6 +30,25 @@ public class FlightMutationBusinessRules {
     }
 
     /**
+     * Назначение и смена гейта: SCHEDULED/DELAYED; inbound DEPARTED (гейт SVO перед прилётом).
+     */
+    public void assertGateMutable(FlightStatus status, FlightHomeAirportRules.OperationKind operationKind) {
+        if (status == FlightStatus.CANCELLED) {
+            throw new BadRequestException(CANCELLED_MESSAGE);
+        }
+        if (status == FlightStatus.ARRIVED) {
+            throw new BadRequestException(ARRIVED_LOCKED_MESSAGE);
+        }
+        if (status == FlightStatus.SCHEDULED || status == FlightStatus.DELAYED) {
+            return;
+        }
+        if (status == FlightStatus.DEPARTED && operationKind == FlightHomeAirportRules.OperationKind.ARRIVAL) {
+            return;
+        }
+        throw new BadRequestException(CLOSED_HISTORY_MESSAGE);
+    }
+
+    /**
      * Расписание, гейт и тип ВС — только пока рейс SCHEDULED или DELAYED.
      */
     public void assertResourcesMutable(FlightStatus status) {

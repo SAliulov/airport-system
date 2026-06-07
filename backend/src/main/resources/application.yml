@@ -39,6 +39,8 @@ jwt:
 airport:
   home-iata: SVO
   timezone: Europe/Moscow
+  gate-plan-window-hours: 12
+  gate-post-grace-minutes: 15
   scheduler:
     flight-status-ms: 60000
     outbound-delay-grace-minutes: 5

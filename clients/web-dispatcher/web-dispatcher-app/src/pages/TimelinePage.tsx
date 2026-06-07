@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageStatus from '../components/PageStatus';
+import { flightStatusColor } from '../features/flights/domain/flightStatusTheme';
 import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import { getGates, getTimeline } from '../services/api';
 import type { GateRs, GateTimelineSegmentRs } from '../types';
 import { formatApiError } from '../utils/apiError';
-import { todayAirportDate } from '../utils/airportTime';
+import { naiveWallMs, todayAirportDate } from '../utils/airportTime';
 
 interface ClippedSegment extends GateTimelineSegmentRs {
   clipFrom: string;
@@ -12,6 +13,8 @@ interface ClippedSegment extends GateTimelineSegmentRs {
 }
 
 function parseWallMs(iso: string): number {
+  const ms = naiveWallMs(iso);
+  if (ms !== 0) return ms;
   const normalized = iso.includes('T') ? iso : iso.replace(' ', 'T');
   const d = new Date(normalized);
   return Number.isNaN(d.getTime()) ? 0 : d.getTime();
@@ -105,17 +108,9 @@ export default function TimelinePage() {
     return Math.max(0.5, ((b - a) / span) * 100);
   }
 
-  const STATUS_COLORS: Record<string, string> = {
-    SCHEDULED: '#3b82f6',
-    DEPARTED: '#f97316',
-    ARRIVED: '#22c55e',
-    DELAYED: '#ef4444',
-    CANCELLED: '#6b7280',
-  };
-
   function segColor(s: ClippedSegment): string {
     const st = s.flightStatus;
-    return st ? (STATUS_COLORS[st] ?? '#3b82f6') : '#3b82f6';
+    return st ? flightStatusColor(st) : '#3b82f6';
   }
 
   const gateRows = [...byGate.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));

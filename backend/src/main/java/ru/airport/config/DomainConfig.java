@@ -5,8 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import ru.airport.business.AircraftTypeBusinessRules;
 import ru.airport.business.AirlineBusinessRules;
 import ru.airport.business.DelayWarningBusinessRules;
+import ru.airport.business.FlightAutoStatusBusinessRules;
 import ru.airport.business.FlightActualTimeRules;
 import ru.airport.business.FlightGenerationBusinessRules;
+import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.FlightMutationBusinessRules;
 import ru.airport.business.FlightStatusBusinessRules;
 import ru.airport.business.GateAssignmentBusinessRules;
@@ -18,6 +20,11 @@ import ru.airport.business.ScheduleSlotBusinessRules;
 
 @Configuration
 public class DomainConfig {
+
+    @Bean
+    public FlightAutoStatusBusinessRules flightAutoStatusBusinessRules() {
+        return new FlightAutoStatusBusinessRules();
+    }
 
     @Bean
     public FlightStatusBusinessRules flightStatusBusinessRules() {
@@ -40,8 +47,10 @@ public class DomainConfig {
     }
 
     @Bean
-    public GateAssignmentBusinessRules gateAssignmentBusinessRules() {
-        return new GateAssignmentBusinessRules();
+    public GateAssignmentBusinessRules gateAssignmentBusinessRules(AirportProperties airportProperties) {
+        return new GateAssignmentBusinessRules(
+                airportProperties.getGatePlanWindowHours(),
+                airportProperties.getGatePostGraceMinutes());
     }
 
     @Bean
@@ -79,6 +88,11 @@ public class DomainConfig {
     public ScheduleSlotBusinessRules scheduleSlotBusinessRules(
             ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules) {
         return new ScheduleSlotBusinessRules(scheduleOccurrenceBusinessRules);
+    }
+
+    @Bean
+    public FlightHomeAirportRules flightHomeAirportRules() {
+        return new FlightHomeAirportRules();
     }
 
     @Bean

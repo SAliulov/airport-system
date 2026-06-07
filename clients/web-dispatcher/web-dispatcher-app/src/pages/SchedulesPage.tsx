@@ -16,92 +16,22 @@ import { formatApiError } from '../utils/apiError';
 import {
   formatAirportDateTime,
   formatAirportTime,
-  fromTimeInputValue,
+  getAirportTimezone,
   isoDayOfWeekLabel,
   todayAirportDate,
-  toTimeInputValue,
 } from '../utils/airportTime';
 import {
   mapScheduleBackendError,
   validateScheduleForm,
-  type ScheduleFormValues,
   type ScheduleSlotFormValues,
 } from '../utils/fieldValidation';
-
-const STATUSES = ['SCHEDULED', 'DEPARTED', 'ARRIVED', 'DELAYED', 'CANCELLED'];
-
-const DOW_OPTIONS = [
-  { value: '1', label: 'Пн' },
-  { value: '2', label: 'Вт' },
-  { value: '3', label: 'Ср' },
-  { value: '4', label: 'Чт' },
-  { value: '5', label: 'Пт' },
-  { value: '6', label: 'Сб' },
-  { value: '7', label: 'Вс' },
-];
-
-const DEFAULT_SLOT: ScheduleSlotFormValues = {
-  dayOfWeek: '1',
-  departureTime: '08:00',
-  arrivalTime: '10:00',
-};
-
-const EMPTY: ScheduleFormValues = {
-  flightNumber: '',
-  originAirport: '',
-  destinationAirport: '',
-  effectiveFrom: todayAirportDate(),
-  effectiveTo: '',
-  isActive: true,
-  periodicityType: 'WEEKLY',
-  periodicityStep: '1',
-  airlineId: '',
-  slots: [{ ...DEFAULT_SLOT }],
-};
-
-function scheduleToForm(schedule: ScheduleRs): ScheduleFormValues {
-  const slots = schedule.slots?.length
-    ? schedule.slots.map(s => ({
-        slotId: s.slotId != null ? String(s.slotId) : undefined,
-        dayOfWeek: s.dayOfWeek != null ? String(s.dayOfWeek) : '',
-        departureTime: toTimeInputValue(s.departureTime),
-        arrivalTime: toTimeInputValue(s.arrivalTime),
-      }))
-    : [{ ...DEFAULT_SLOT }];
-
-  return {
-    flightNumber: schedule.flightNumber,
-    originAirport: schedule.originAirport.trim(),
-    destinationAirport: schedule.destinationAirport.trim(),
-    effectiveFrom: schedule.effectiveFrom ?? todayAirportDate(),
-    effectiveTo: schedule.effectiveTo ?? '',
-    isActive: schedule.isActive ?? true,
-    periodicityType: schedule.periodicityType ?? 'WEEKLY',
-    periodicityStep: String(schedule.periodicityStep ?? 1),
-    airlineId: String(schedule.airline?.airlineId ?? ''),
-    slots,
-  };
-}
-
-function buildSchedulePayload(form: ScheduleFormValues) {
-  return {
-    flightNumber: form.flightNumber.trim(),
-    originAirport: form.originAirport.trim().toUpperCase(),
-    destinationAirport: form.destinationAirport.trim().toUpperCase(),
-    effectiveFrom: form.effectiveFrom,
-    effectiveTo: form.effectiveTo || null,
-    isActive: form.isActive,
-    periodicityType: form.periodicityType,
-    periodicityStep: Number(form.periodicityStep),
-    airlineId: Number(form.airlineId),
-    slots: form.slots.map(slot => ({
-      ...(slot.slotId ? { slotId: Number(slot.slotId) } : {}),
-      dayOfWeek: form.periodicityType === 'INTERVAL' ? null : Number(slot.dayOfWeek),
-      departureTime: fromTimeInputValue(slot.departureTime),
-      arrivalTime: fromTimeInputValue(slot.arrivalTime),
-    })),
-  };
-}
+import {
+  buildSchedulePayload,
+  EMPTY_SCHEDULE_FORM as EMPTY,
+  DEFAULT_SCHEDULE_SLOT as DEFAULT_SLOT,
+  scheduleToForm,
+} from '../features/schedules/scheduleFormMappers';
+import { ScheduleFormModal } from '../features/schedules/components/ScheduleFormModal';
 
 function formatSlotSummary(slot: ScheduleSlotRs, periodicityType?: PeriodicityType): string {
   const dow = periodicityType === 'INTERVAL' ? '' : `${isoDayOfWeekLabel(slot.dayOfWeek)} `;
@@ -139,6 +69,7 @@ function periodicityLabel(schedule: ScheduleRs): string {
 }
 
 export default function SchedulesPage() {
+  const airportTz = getAirportTimezone();
   const [items, setItems] = useState<ScheduleRs[]>([]);
   const [airlines, setAirlines] = useState<AirlineRs[]>([]);
   const [form, setForm] = useState(EMPTY);
@@ -147,7 +78,6 @@ export default function SchedulesPage() {
   const debouncedSearch = useDebouncedValue(search.trim(), 400);
   const [filterDate, setFilterDate] = useState('');
   const [filterAirline, setFilterAirline] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
   const [filterOrigin, setFilterOrigin] = useState('');
   const [filterDestination, setFilterDestination] = useState('');
   const [pageError, setPageError] = useState<string | null>(null);
@@ -156,13 +86,16 @@ export default function SchedulesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reactivationHint, setReactivationHint] = useState<{
+    scheduleId: number;
+    flightNumber: string;
+  } | null>(null);
 
   const load = useCallback(() => {
     setPageError(null);
     const params: Record<string, string> = {};
     if (filterDate) params.date = filterDate;
     if (filterAirline) params.airline = filterAirline;
-    if (filterStatus) params.status = filterStatus;
     if (filterOrigin.length === 3) params.origin = filterOrigin;
     if (filterDestination.length === 3) params.destination = filterDestination;
     const request = debouncedSearch
@@ -173,7 +106,7 @@ export default function SchedulesPage() {
     request
       .then(setItems)
       .catch(e => setPageError(formatApiError(e)));
-  }, [filterAirline, filterDate, filterDestination, filterOrigin, filterStatus, debouncedSearch]);
+  }, [filterAirline, filterDate, filterDestination, filterOrigin, debouncedSearch]);
 
   const waitingForServer = useRetryWhenBackendUp(pageError, setPageError, load);
 
@@ -305,13 +238,34 @@ export default function SchedulesPage() {
     setSaving(true);
     setModalError(null);
     try {
-      await updateSchedule(editingId, buildSchedulePayload(form));
+      const saved = await updateSchedule(editingId, buildSchedulePayload(form));
       closeEditModal();
       load();
+      if (saved.reactivationSuggested) {
+        setReactivationHint({
+          scheduleId: saved.scheduleId,
+          flightNumber: saved.flightNumber,
+        });
+      }
     } catch (e: unknown) {
       handleSubmitError(e);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function activateScheduleTemplate(scheduleId: number) {
+    const schedule = items.find(s => s.scheduleId === scheduleId);
+    if (!schedule) return;
+    try {
+      await updateSchedule(scheduleId, buildSchedulePayload({
+        ...scheduleToForm(schedule),
+        isActive: true,
+      }));
+      setReactivationHint(null);
+      load();
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
     }
   }
 
@@ -326,276 +280,77 @@ export default function SchedulesPage() {
     }
   }
 
-  function invalidClass(field: string) {
-    return fieldErrors[field] ? 'field-invalid' : '';
-  }
-
-  function scheduleFormFields() {
-    return (
-      <div className="modal-form-grid">
-        <div className="modal-field">
-          <span className="modal-field__label">Номер рейса</span>
-          <input
-            className={invalidClass('flightNumber')}
-            placeholder="SU1234"
-            maxLength={20}
-            value={form.flightNumber}
-            onChange={e => {
-              clearFieldError('flightNumber');
-              setForm(p => ({ ...p, flightNumber: e.target.value.toUpperCase() }));
-            }}
-          />
-          {fieldErrors.flightNumber && (
-            <span className="modal-field__error">{fieldErrors.flightNumber}</span>
-          )}
-        </div>
-
-        <div className="modal-form-row">
-          <div className="modal-field">
-            <span className="modal-field__label">Откуда (IATA)</span>
-            <input
-              className={invalidClass('originAirport')}
-              maxLength={3}
-              placeholder="SVO"
-              value={form.originAirport}
-              onChange={e => {
-                clearFieldError('originAirport');
-                clearFieldError('destinationAirport');
-                setForm(p => ({ ...p, originAirport: e.target.value.toUpperCase() }));
-              }}
-            />
-            {fieldErrors.originAirport && (
-              <span className="modal-field__error">{fieldErrors.originAirport}</span>
-            )}
-          </div>
-          <div className="modal-field">
-            <span className="modal-field__label">Куда (IATA)</span>
-            <input
-              className={invalidClass('destinationAirport')}
-              maxLength={3}
-              placeholder="LED"
-              value={form.destinationAirport}
-              onChange={e => {
-                clearFieldError('destinationAirport');
-                clearFieldError('originAirport');
-                setForm(p => ({ ...p, destinationAirport: e.target.value.toUpperCase() }));
-              }}
-            />
-            {fieldErrors.destinationAirport && (
-              <span className="modal-field__error">{fieldErrors.destinationAirport}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="modal-form-row">
-          <div className="modal-field">
-            <span className="modal-field__label">Действует с</span>
-            <input
-              className={invalidClass('effectiveFrom')}
-              type="date"
-              value={form.effectiveFrom}
-              onChange={e => {
-                clearFieldError('effectiveFrom');
-                clearFieldError('effectiveTo');
-                setForm(p => ({ ...p, effectiveFrom: e.target.value }));
-              }}
-            />
-            {fieldErrors.effectiveFrom && (
-              <span className="modal-field__error">{fieldErrors.effectiveFrom}</span>
-            )}
-          </div>
-          <div className="modal-field">
-            <span className="modal-field__label">Действует по</span>
-            <input
-              className={invalidClass('effectiveTo')}
-              type="date"
-              value={form.effectiveTo}
-              onChange={e => {
-                clearFieldError('effectiveTo');
-                setForm(p => ({ ...p, effectiveTo: e.target.value }));
-              }}
-            />
-            {fieldErrors.effectiveTo && (
-              <span className="modal-field__error">{fieldErrors.effectiveTo}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="modal-form-row">
-          <div className="modal-field">
-            <span className="modal-field__label">Периодичность</span>
-            <select
-              className={invalidClass('periodicityType')}
-              value={form.periodicityType}
-              onChange={e => handlePeriodicityChange(e.target.value as PeriodicityType)}
-            >
-              <option value="WEEKLY">WEEKLY — по дням недели</option>
-              <option value="INTERVAL">INTERVAL — через N дней</option>
-            </select>
-          </div>
-          <div className="modal-field">
-            <span className="modal-field__label">Шаг</span>
-            <input
-              className={invalidClass('periodicityStep')}
-              type="number"
-              min={1}
-              value={form.periodicityStep}
-              onChange={e => {
-                clearFieldError('periodicityStep');
-                setForm(p => ({ ...p, periodicityStep: e.target.value }));
-              }}
-            />
-            {fieldErrors.periodicityStep && (
-              <span className="modal-field__error">{fieldErrors.periodicityStep}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="modal-field">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))}
-            />
-            Активный шаблон
-          </label>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, marginLeft: 28 }}>
-            Нельзя снять активность, если по шаблону уже созданы рейсы — сначала удалите рейсы.
-          </p>
-        </div>
-
-        <div className="modal-field">
-          <span className="modal-field__label">Слоты</span>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
-            День недели слота должен попадать в период действия шаблона — иначе при сохранении будет ошибка.
-          </p>
-          {form.slots.map((slot, index) => (
-            <div key={index} className="modal-form-row" style={{ marginBottom: 8 }}>
-              {form.periodicityType === 'WEEKLY' && (
-                <select
-                  className={invalidClass('slots')}
-                  value={slot.dayOfWeek}
-                  onChange={e => updateSlot(index, { dayOfWeek: e.target.value })}
-                >
-                  {DOW_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              )}
-              <input
-                className={invalidClass('slots')}
-                type="time"
-                value={slot.departureTime}
-                title="Вылет"
-                onChange={e => updateSlot(index, { departureTime: e.target.value })}
-              />
-              <input
-                className={invalidClass('slots')}
-                type="time"
-                value={slot.arrivalTime}
-                title="Прилёт"
-                onChange={e => updateSlot(index, { arrivalTime: e.target.value })}
-              />
-              {form.periodicityType === 'WEEKLY' && form.slots.length > 1 && (
-                <button type="button" className="btn-ghost btn-sm" onClick={() => removeSlot(index)}>
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-          {form.periodicityType === 'WEEKLY' && (
-            <button type="button" className="btn-ghost btn-sm" onClick={addSlot}>
-              + слот
-            </button>
-          )}
-          {fieldErrors.slots && (
-            <span className="modal-field__error">{fieldErrors.slots}</span>
-          )}
-        </div>
-
-        <div className="modal-field">
-          <span className="modal-field__label">Авиакомпания</span>
-          <select
-            className={invalidClass('airlineId')}
-            value={form.airlineId}
-            onChange={e => {
-              clearFieldError('airlineId');
-              setForm(p => ({ ...p, airlineId: e.target.value }));
-            }}
-          >
-            <option value="">— выберите —</option>
-            {airlines.map(a => (
-              <option key={a.airlineId} value={String(a.airlineId)}>
-                {a.iataCode} — {a.name}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.airlineId && (
-            <span className="modal-field__error">{fieldErrors.airlineId}</span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const modalFooter = (onCancel: () => void, onSubmit: () => void, submitLabel: string, pendingLabel: string) => (
-    <div className="modal-actions modal-actions--center">
-      <button type="button" className="btn-ghost" onClick={onCancel} disabled={saving}>
-        Отмена
-      </button>
-      <button type="button" className="btn-primary" disabled={saving} onClick={onSubmit}>
-        {saving ? pendingLabel : submitLabel}
-      </button>
-    </div>
-  );
-
   return (
     <div className="page">
       <h1>Плановое расписание рейсов</h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
 
-      {createModalOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="schedule-create-title">
-          <div className="modal-card modal-card--form">
-            <h3 id="schedule-create-title">Добавить расписание</h3>
-            {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
-            {scheduleFormFields()}
-            {modalFooter(
-              closeCreateModal,
-              () => void submitCreate(),
-              'Создать',
-              'Создание…',
-            )}
-          </div>
+      {reactivationHint && (
+        <div className="page-success-banner" role="status">
+          Период действия шаблона {reactivationHint.flightNumber} продлён, но он выключен.
+          {' '}
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => void activateScheduleTemplate(reactivationHint.scheduleId)}
+          >
+            Включить сейчас
+          </button>
+          <button
+            type="button"
+            className="btn-ghost btn-sm page-success-banner__close"
+            onClick={() => setReactivationHint(null)}
+            aria-label="Закрыть"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {editModalOpen && editingId != null && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="schedule-edit-title"
-          onClick={e => {
-            if (e.target === e.currentTarget) closeEditModal();
-          }}
-        >
-          <div className="modal-card modal-card--form" onClick={e => e.stopPropagation()}>
-            <h3 id="schedule-edit-title">Редактирование расписания</h3>
-            {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
-            {scheduleFormFields()}
-            {modalFooter(
-              closeEditModal,
-              () => void submitEdit(),
-              'Сохранить',
-              'Сохранение…',
-            )}
-          </div>
-        </div>
-      )}
+      <ScheduleFormModal
+        open={createModalOpen}
+        title="Добавить расписание"
+        titleId="schedule-create-title"
+        modalError={modalError}
+        form={form}
+        fieldErrors={fieldErrors}
+        airlines={airlines}
+        saving={saving}
+        submitLabel="Создать"
+        pendingLabel="Создание…"
+        onClose={closeCreateModal}
+        onSubmit={() => void submitCreate()}
+        onFormChange={setForm}
+        onClearFieldError={clearFieldError}
+        onPeriodicityChange={handlePeriodicityChange}
+        onUpdateSlot={updateSlot}
+        onAddSlot={addSlot}
+        onRemoveSlot={removeSlot}
+      />
 
-      <div className="form-row" style={{ marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+      <ScheduleFormModal
+        open={editModalOpen && editingId != null}
+        title="Редактирование расписания"
+        titleId="schedule-edit-title"
+        modalError={modalError}
+        form={form}
+        fieldErrors={fieldErrors}
+        airlines={airlines}
+        saving={saving}
+        submitLabel="Сохранить"
+        pendingLabel="Сохранение…"
+        onClose={closeEditModal}
+        onSubmit={() => void submitEdit()}
+        onFormChange={setForm}
+        onClearFieldError={clearFieldError}
+        onPeriodicityChange={handlePeriodicityChange}
+        onUpdateSlot={updateSlot}
+        onAddSlot={addSlot}
+        onRemoveSlot={removeSlot}
+        dismissOnOverlayClick
+      />
+
+      <div className="form-row schedules-toolbar">
         <input
           placeholder="Поиск по номеру рейса…"
           value={search}
@@ -604,7 +359,7 @@ export default function SchedulesPage() {
         <input
           type="date"
           value={filterDate}
-          title="День планового вылета (Europe/Moscow)"
+          title={`День планового вылета (${airportTz})`}
           onChange={e => setFilterDate(e.target.value)}
         />
         <select value={filterAirline} onChange={e => setFilterAirline(e.target.value)}>
@@ -613,21 +368,17 @@ export default function SchedulesPage() {
             <option key={a.airlineId} value={String(a.airlineId)}>{a.iataCode} — {a.name}</option>
           ))}
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">Все статусы</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
         <input
           placeholder="Откуда (IATA)"
           maxLength={3}
-          style={{ width: 110 }}
+          className="filter-iata-input"
           value={filterOrigin}
           onChange={e => setFilterOrigin(e.target.value.toUpperCase())}
         />
         <input
           placeholder="Куда (IATA)"
           maxLength={3}
-          style={{ width: 110 }}
+          className="filter-iata-input"
           value={filterDestination}
           onChange={e => setFilterDestination(e.target.value.toUpperCase())}
         />
@@ -635,8 +386,12 @@ export default function SchedulesPage() {
           Добавить
         </button>
         <p className="filter-date-hint">
+          Шаблон расписания → слот (день/время) → рейс на дату (статус SCHEDULED/DEPARTED/… только у рейса).
+          {' '}
+          Экспорт операционного расписания на день (PDF/Excel) — на странице «Рейсы».
+          {' '}
           {filterDate
-            ? `Показаны слоты с плановым вылетом ${filterDate} (MSK).`
+            ? `Показаны шаблоны с рейсом на ${filterDate} (MSK).`
             : 'Фильтр по дате не задан — все шаблоны.'}
         </p>
       </div>

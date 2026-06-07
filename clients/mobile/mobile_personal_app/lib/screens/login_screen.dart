@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import '../config.dart';
-import '../core/theme/app_theme.dart';
+import '../core/di/app_scope.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  final AuthService auth;
   final VoidCallback onLoginSuccess;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
 
   const LoginScreen({
     super.key,
-    required this.auth,
     required this.onLoginSuccess,
+    this.isDarkMode = false,
+    required this.onToggleTheme,
   });
 
   @override
@@ -48,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await AppConfig.setApiBase(_serverCtrl.text.trim());
-      await widget.auth.login(
+      await AppScope.of(context).auth.login(
         _userCtrl.text.trim(),
         _passCtrl.text,
       );
@@ -77,6 +79,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            tooltip: widget.isDarkMode ? 'Светлая тема' : 'Тёмная тема',
+            onPressed: widget.onToggleTheme,
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -102,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Оперативный персонал',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 28),

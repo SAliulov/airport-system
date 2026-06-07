@@ -1,3 +1,11 @@
+/// Safe JSON int parse (Jackson may emit num, not int).
+int? parseJsonInt(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
 /// Категория события операционной ленты (mirror backend OperationalEventCategory).
 enum OperationalEventCategory {
   gate,
@@ -57,7 +65,7 @@ class OperationalEvent {
       category: parseOperationalCategory(json['category']?.toString()),
       message: json['message']?.toString() ?? '',
       details: json['details']?.toString(),
-      flightId: json['flightId'] as int?,
+      flightId: parseJsonInt(json['flightId']),
       flightNumber: json['flightNumber']?.toString(),
     );
   }

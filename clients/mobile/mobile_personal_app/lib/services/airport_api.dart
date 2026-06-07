@@ -12,12 +12,20 @@ class AirportApi {
 
   /// Список рейсов (анонимный GET).
   Future<List<FlightDetail>> getFlights() async {
-    final uri = Uri.parse('${AppConfig.apiBase}/api/v1/flights');
+    final uri = Uri.parse('${AppConfig.apiBase}/api/v1/flights?size=100');
 
     final resp = await http.get(uri, headers: auth.authHeaders);
     if (resp.statusCode != 200) throw ApiException('HTTP ${resp.statusCode}');
 
-    final list = jsonDecode(resp.body) as List<dynamic>;
+    final decoded = jsonDecode(resp.body);
+    final List<dynamic> list;
+    if (decoded is Map<String, dynamic> && decoded['content'] is List) {
+      list = decoded['content'] as List<dynamic>;
+    } else if (decoded is List) {
+      list = decoded;
+    } else {
+      throw ApiException('Unexpected flights response');
+    }
     return list
         .map((e) => FlightDetail.fromJson(e as Map<String, dynamic>))
         .toList();

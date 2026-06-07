@@ -6,6 +6,7 @@ class RealtimeEvent {
   final int flightId;
   final String title;
   final String subtitle;
+  final Map<String, dynamic>? payload;
   final DateTime receivedAt;
 
   RealtimeEvent({
@@ -13,6 +14,7 @@ class RealtimeEvent {
     required this.flightId,
     required this.title,
     required this.subtitle,
+    this.payload,
     DateTime? receivedAt,
   }) : receivedAt = receivedAt ?? DateTime.now();
 }

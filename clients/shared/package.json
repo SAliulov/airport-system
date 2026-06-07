@@ -1,0 +1,13 @@
+{
+  "name": "@airport/shared",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@stomp/stompjs": "^7.3.0",
+    "@types/react": "^19.2.14",
+    "@types/sockjs-client": "^1.5.4",
+    "react": "^19.2.4",
+    "sockjs-client": "^1.6.1",
+    "typescript": "~6.0.2"
+  }
+}

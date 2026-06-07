@@ -36,7 +36,10 @@ class OperationalEventMapperTest {
         AirportProperties properties = new AirportProperties();
         properties.setHomeIata("SVO");
         properties.setTimezone("Europe/Moscow");
-        mapper = new OperationalEventMapper(new AirportClock(properties));
+        mapper = new OperationalEventMapper(
+                new AirportClock(properties),
+                new FlightOperationalMessages(),
+                new ScheduleOperationalMessages());
         dispatcherAuth = new UsernamePasswordAuthenticationToken(
                 "dispatcher",
                 "n/a",

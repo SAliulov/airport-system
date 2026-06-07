@@ -1,6 +1,7 @@
 import {
   formatShortDateWithDow,
   fromTimeInputValue,
+  getHomeIata,
   isoDayOfWeekLabel,
   slotDayFitsEffectivePeriod,
 } from './airportTime';
@@ -120,6 +121,8 @@ export function validateScheduleForm(form: ScheduleFormValues): ValidationResult
     errors.destinationAirport = 'IATA аэропорта: 3 латинские буквы.';
   } else if (origin && origin === destination) {
     errors.destinationAirport = 'Аэропорты вылета и прилёта должны различаться.';
+  } else if (origin && destination && origin !== getHomeIata() && destination !== getHomeIata()) {
+    errors.destinationAirport = `Маршрут должен проходить через базовый аэропорт (${getHomeIata()}).`;
   }
 
   if (!form.effectiveFrom) {

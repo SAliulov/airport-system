@@ -33,4 +33,7 @@ public class ScheduleRs {
     /** Вычисляемые поля при фильтрации по дате (optional). */
     private LocalDateTime departureAtDate;
     private LocalDateTime arrivalAtDate;
+
+    /** UI-hint: период продлён, но шаблон выключен — можно включить вручную. */
+    private Boolean reactivationSuggested;
 }
