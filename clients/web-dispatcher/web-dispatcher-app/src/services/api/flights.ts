@@ -5,6 +5,7 @@ import type {
   DelayWarningRq,
   FlightGenerateRq,
   FlightGenerateRs,
+  FlightBulkDeleteRs,
   FlightStatusUpdateRq,
   GateAssignmentRq,
 } from '../../types/requests';
@@ -76,6 +77,10 @@ export const updateFlight = (id: number, d: CreateFlightRq) =>
 
 export const deleteFlight = (id: number) =>
   apiClient.delete(`/flights/${id}`, { headers: authHeaders() });
+
+export const deleteFlightsBySchedule = (scheduleId: number) =>
+  apiClient.delete<FlightBulkDeleteRs>(`/flights/by-schedule/${scheduleId}`, { headers: authHeaders() })
+    .then(r => r.data);
 
 export const updateFlightStatus = (id: number, body: FlightStatusUpdateRq) =>
   apiClient.put<FlightRs>(`/flights/${id}/status`, body, { headers: authHeaders() }).then(r => r.data);

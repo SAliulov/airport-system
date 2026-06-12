@@ -12,6 +12,7 @@ import ru.airport.config.AirportClock;
 import ru.airport.config.AirportProperties;
 import ru.airport.dto.ScheduleRq;
 import ru.airport.dto.ScheduleRs;
+import ru.airport.dto.ScheduleSlotRq;
 import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
@@ -33,9 +34,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -190,6 +193,7 @@ public class ScheduleService {
         scheduleBusinessRules.assertMayUpdate(existing, ScheduleDraftMapper.from(rq), linkedFlights);
         Airline airline = airlineRepository.findById(rq.getAirlineId())
                 .orElseThrow(() -> new ResourceNotFoundException("Airline", rq.getAirlineId()));
+        assertLinkedSlotTimesUnchanged(existing, rq);
         mapper.applyFields(rq, existing, airline);
         mapper.mergeSlots(rq.getSlots(), existing, flightRepository::existsBySlot_SlotId);
         scheduleSlotBusinessRules.assertValidSlots(existing, ScheduleDraftMapper.slotsFrom(rq.getSlots()));
@@ -222,6 +226,36 @@ public class ScheduleService {
         for (Flight linked : linkedFlights) {
             Flight fresh = flightRepository.findById(linked.getFlightId()).orElseThrow();
             realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(fresh));
+        }
+    }
+
+    private void assertLinkedSlotTimesUnchanged(Schedule existing, ScheduleRq rq) {
+        if (rq.getSlots() == null || existing.getSlots() == null) {
+            return;
+        }
+        Map<Integer, ScheduleSlotRq> requestedById = new HashMap<>();
+        for (ScheduleSlotRq slotRq : rq.getSlots()) {
+            if (slotRq.getSlotId() != null) {
+                requestedById.put(slotRq.getSlotId(), slotRq);
+            }
+        }
+        for (var slot : existing.getSlots()) {
+            Integer slotId = slot.getSlotId();
+            if (slotId == null || !flightRepository.existsBySlot_SlotId(slotId)) {
+                continue;
+            }
+            ScheduleSlotRq requested = requestedById.get(slotId);
+            if (requested == null) {
+                continue;
+            }
+            boolean changed = !Objects.equals(slot.getDayOfWeek(), requested.getDayOfWeek())
+                    || !Objects.equals(slot.getDepartureTime(), requested.getDepartureTime())
+                    || !Objects.equals(slot.getArrivalTime(), requested.getArrivalTime());
+            if (changed) {
+                throw new ConflictException(
+                        "Нельзя изменить день недели или время слота: по нему уже созданы рейсы. "
+                                + "Удалите рейсы по шаблону и сгенерируйте их заново.");
+            }
         }
     }
 

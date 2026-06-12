@@ -26,6 +26,7 @@ export function FlightTable({ flights, highlightIds }: Props) {
           <th>Прилёт (факт)</th>
           <th>Статус</th>
           <th>Гейт</th>
+          <th>Терминал</th>
         </tr>
       </thead>
       <tbody>
@@ -48,6 +49,7 @@ export function FlightTable({ flights, highlightIds }: Props) {
                 <td>{formatAirportTime(f.actualArrival)}</td>
                 <td><StatusBadge status={f.status} /></td>
                 <td className="cell-gate">—</td>
+                <td>—</td>
               </tr>
             );
           }
@@ -74,6 +76,7 @@ export function FlightTable({ flights, highlightIds }: Props) {
               <td>{formatAirportTime(f.actualArrival)}</td>
               <td><StatusBadge status={f.status} /></td>
               <td className="cell-gate">{gateLabel}</td>
+              <td>{gate?.terminal ?? '—'}</td>
             </tr>
           );
         })}

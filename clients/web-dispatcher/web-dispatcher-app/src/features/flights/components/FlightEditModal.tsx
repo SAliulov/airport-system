@@ -97,7 +97,7 @@ export function FlightEditModal({
         <p className="modal-hint">
           {actualTimesOnly
             ? 'Исправьте фактическое время вылета и/или прилёта. Остальные параметры рейса закрыты.'
-            : 'Заполните нужные поля и нажмите «Применить изменения». Данные уйдут на сервер, таблица обновится автоматически.'}
+            : 'Заполните нужные поля и нажмите «Применить изменения».'}
         </p>
         <div className="modal-card__body">
           <section className="panel-section panel-section--bordered">

@@ -1,5 +1,6 @@
 package ru.airport.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -29,6 +30,7 @@ public class AircraftTypeRq {
     private String icaoCode;
 
     @PositiveOrZero
+    @Digits(integer=3, fraction=0, message = "Не более 3-х знаков")
     private Integer passengerCapacity;
 
     @NotNull

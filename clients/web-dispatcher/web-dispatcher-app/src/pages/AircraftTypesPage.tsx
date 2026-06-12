@@ -12,6 +12,7 @@ export default function AircraftTypesPage() {
   const [items, setItems] = useState<AircraftTypeRs[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
+  const [filter, setFilter] = useState('');
   const [pageError, setPageError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -79,11 +80,33 @@ export default function AircraftTypesPage() {
     setFieldErrors({});
   }
 
+  const visibleItems = items.filter(a => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return true;
+    return [
+      a.icaoCode,
+      String(a.passengerCapacity ?? ''),
+      a.sizeCategory ?? '',
+    ].some(value => value.toLowerCase().includes(q));
+  });
+
   return (
     <div className="page">
       <h1>Типы воздушных судов</h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
-      <div className="form-row">
+      <div className="form-row form-row--toolbar directory-filter-row">
+        <input
+          placeholder="Фильтр по ICAO, вместимости или категории"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
+        {filter && (
+          <button type="button" className="btn-ghost btn-sm" onClick={() => setFilter('')}>
+            Сбросить
+          </button>
+        )}
+      </div>
+      <div className="form-row directory-form-row">
         <div className="inline-field">
           <input
             placeholder="ICAO (2–4 символа)"
@@ -99,9 +122,10 @@ export default function AircraftTypesPage() {
             placeholder="Вместимость"
             type="number"
             min={0}
+            max={999}
             value={form.passengerCapacity}
             className={fieldErrors.passengerCapacity ? 'field-invalid' : undefined}
-            onChange={e => setForm(f => ({ ...f, passengerCapacity: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, passengerCapacity: e.target.value.slice(0, 3) }))}
           />
           {fieldErrors.passengerCapacity && (
             <span className="modal-field__error">{fieldErrors.passengerCapacity}</span>
@@ -131,7 +155,7 @@ export default function AircraftTypesPage() {
       <table className="data-table">
         <thead><tr><th>ICAO</th><th>Вместимость</th><th>Категория</th><th></th></tr></thead>
         <tbody>
-          {items.map(a => (
+          {visibleItems.map(a => (
             <tr key={a.aircraftTypeId}>
               <td>{a.icaoCode}</td>
               <td>{a.passengerCapacity ?? '—'}</td>

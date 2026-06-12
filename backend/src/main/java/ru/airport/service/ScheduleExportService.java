@@ -91,12 +91,12 @@ public class ScheduleExportService {
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
         Document doc = new Document(pdf);
-        doc.add(pdfParagraph("Airport schedule - " + date, font, true).setTextAlignment(TextAlignment.CENTER));
+        doc.add(pdfParagraph("Расписание аэропорта на: " + date, font, true).setTextAlignment(TextAlignment.CENTER));
         doc.add(new Paragraph(" "));
 
         float[] cols = {1.2f, 1f, 0.8f, 0.8f, 1.4f, 1.4f, 1.1f, 0.9f};
         Table table = new Table(UnitValue.createPercentArray(cols)).useAllAvailableWidth();
-        String[] headers = {"Flight", "Airline", "From", "To", "Departure", "Arrival", "Status", "Gate"};
+        String[] headers = {"Рейс", "Авиакомпания", "Откуда", "Куда", "Отправка", "Прибытие", "Статус", "Гейт"};
         for (String h : headers) {
             table.addHeaderCell(headerCell(h, font));
         }

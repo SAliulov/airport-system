@@ -12,6 +12,7 @@ export default function GatesPage() {
   const [items, setItems] = useState<GateRs[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
+  const [filter, setFilter] = useState('');
   const [pageError, setPageError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -80,11 +81,35 @@ export default function GatesPage() {
     setFieldErrors({});
   }
 
+  const visibleItems = items.filter(g => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return true;
+    const activeLabel = g.isActive ? 'активен active' : 'неактивен inactive';
+    return [
+      g.gateNumber,
+      g.terminal ?? '',
+      g.maxSizeCategory ?? '',
+      activeLabel,
+    ].some(value => value.toLowerCase().includes(q));
+  });
+
   return (
     <div className="page">
       <h1>Гейты</h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
-      <div className="form-row">
+      <div className="form-row form-row--toolbar directory-filter-row">
+        <input
+          placeholder="Фильтр по номеру, терминалу, категории или активности"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
+        {filter && (
+          <button type="button" className="btn-ghost btn-sm" onClick={() => setFilter('')}>
+            Сбросить
+          </button>
+        )}
+      </div>
+      <div className="form-row directory-form-row">
         <div className="inline-field">
           <input
             placeholder="Номер гейта"
@@ -119,7 +144,7 @@ export default function GatesPage() {
             <span className="modal-field__error">{fieldErrors.maxSizeCategory}</span>
           )}
         </div>
-        <label className="modal-field__checkbox inline-check">
+        <label className="inline-check directory-inline-check">
           <input
             type="checkbox"
             checked={form.isActive}
@@ -139,7 +164,7 @@ export default function GatesPage() {
       <table className="data-table">
         <thead><tr><th>Номер</th><th>Терминал</th><th>Макс. категория</th><th>Активен</th><th></th></tr></thead>
         <tbody>
-          {items.map(g => (
+          {visibleItems.map(g => (
             <tr key={g.gateId}>
               <td>{g.gateNumber}</td>
               <td>{g.terminal ?? '—'}</td>

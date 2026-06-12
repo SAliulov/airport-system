@@ -91,6 +91,7 @@ public class FlightResourceService {
         flightHomeAirportRules.assertValidHomeRoute(flight.getSchedule(), homeIata());
         gateAssignmentBusinessRules.assertGateIsActive(gate);
         gateAssignmentBusinessRules.assertValidInterval(rq.getAssignedFrom(), rq.getAssignedTo());
+        gateAssignmentBusinessRules.assertAssignmentStartsNotInPast(rq.getAssignedFrom(), airportClock.now());
 
         FlightHomeAirportRules.OperationKind kind =
                 flightHomeAirportRules.resolveOperationKind(flight.getSchedule(), homeIata());

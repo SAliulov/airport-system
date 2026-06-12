@@ -5,6 +5,7 @@ import {
 } from '../components/FlightCreateModal';
 import type { Dispatch, SetStateAction } from 'react';
 import { createFlight, generateFlights, getSchedules } from '../../../services/api';
+import { deleteFlightsBySchedule } from '../../../services/api/flights';
 import { formatApiError } from '../../../utils/apiError';
 import { formatAirportDateTime, todayAirportDate } from '../../../utils/airportTime';
 import type { ScheduleRs, ScheduleSlotRs } from '../../../types';
@@ -47,6 +48,7 @@ export function useFlightPageModals({
   const [generateTo, setGenerateTo] = useState('');
   const [generateScheduleId, setGenerateScheduleId] = useState('');
   const [generateSaving, setGenerateSaving] = useState(false);
+  const [bulkDeleteSaving, setBulkDeleteSaving] = useState(false);
   const [generateInfo, setGenerateInfo] = useState<string | null>(null);
 
   const availableSlots = useMemo(() => {
@@ -110,6 +112,11 @@ export function useFlightPageModals({
       setGenerateInfo('Дата окончания не может быть раньше даты начала.');
       return;
     }
+    const today = todayAirportDate();
+    if (generateFrom < today) {
+      setGenerateInfo(`Период генерации не может начинаться раньше ${today} (MSK).`);
+      return;
+    }
     setGenerateSaving(true);
     setGenerateInfo(null);
     try {
@@ -134,6 +141,33 @@ export function useFlightPageModals({
       setGenerateInfo(formatApiError(e));
     } finally {
       setGenerateSaving(false);
+    }
+  }
+
+  async function submitBulkDeleteBySchedule() {
+    if (!generateScheduleId) {
+      setGenerateInfo('Выберите шаблон, по которому нужно удалить сгенерированные рейсы.');
+      return;
+    }
+    const schedule = schedules.find(s => String(s.scheduleId) === generateScheduleId);
+    const label = schedule
+      ? `${schedule.flightNumber} ${schedule.originAirport.trim()}→${schedule.destinationAirport.trim()}`
+      : `#${generateScheduleId}`;
+    if (!confirm(`Удалить все рейсы шаблона ${label}? Уже вылетевшие/прибывшие рейсы сервер не удалит.`)) {
+      return;
+    }
+    setBulkDeleteSaving(true);
+    setGenerateInfo(null);
+    try {
+      const result = await deleteFlightsBySchedule(Number(generateScheduleId));
+      setGenerateInfo(`Удалено рейсов по шаблону: ${result.deleted}.`);
+      setFilterDate('');
+      setSchedules(await getSchedules());
+      load('');
+    } catch (e: unknown) {
+      setGenerateInfo(formatApiError(e));
+    } finally {
+      setBulkDeleteSaving(false);
     }
   }
 
@@ -196,8 +230,10 @@ export function useFlightPageModals({
     generateScheduleId,
     setGenerateScheduleId,
     generateSaving,
+    bulkDeleteSaving,
     generateInfo,
     openGenerateModal,
     submitGenerate,
+    submitBulkDeleteBySchedule,
   };
 }

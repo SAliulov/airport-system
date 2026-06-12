@@ -30,6 +30,13 @@ public class GateAssignmentBusinessRules {
         }
     }
 
+    public void assertAssignmentStartsNotInPast(LocalDateTime assignedFrom, LocalDateTime now) {
+        if (assignedFrom != null && now != null && assignedFrom.isBefore(now)) {
+            throw new BadRequestException(
+                    "Интервал назначения гейта не может начинаться в прошлом по времени аэропорта (" + now + ")");
+        }
+    }
+
     /**
      * Интервал гейта должен пересекаться с окном ±planWindowHours вокруг планового якоря рейса.
      */

@@ -215,9 +215,11 @@ export default function FlightsPage() {
         onGenerateScheduleIdChange={modals.setGenerateScheduleId}
         generateInfo={modals.generateInfo}
         generateSaving={modals.generateSaving}
+        bulkDeleteSaving={modals.bulkDeleteSaving}
         schedules={schedules}
         onClose={() => modals.setGenerateModalOpen(false)}
         onSubmit={() => void modals.submitGenerate()}
+        onBulkDeleteBySchedule={() => void modals.submitBulkDeleteBySchedule()}
       />
 
       {edit.editingId != null && edit.editDetail && (

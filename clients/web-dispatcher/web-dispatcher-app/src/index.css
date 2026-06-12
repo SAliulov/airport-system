@@ -67,6 +67,26 @@ body {
   padding-bottom: 8px;
 }
 
+.directory-filter-row input {
+  min-width: min(360px, 100%);
+}
+
+.directory-form-row {
+  align-items: flex-start;
+}
+
+.directory-form-row > button,
+.directory-inline-check {
+  min-height: 38px;
+}
+
+.directory-inline-check {
+  flex-direction: row !important;
+  align-items: center !important;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
 .pagination-bar {
   display: flex;
   align-items: center;
@@ -158,7 +178,7 @@ button:focus-visible {
   border: 1px solid var(--border);
 }
 .btn-ghost:hover:not(:disabled) { background: var(--surface2); }
-.btn-danger { background: var(--danger); color: #fff; padding: 6px 12px; }
+.btn-danger { background: var(--danger); color: #fff; padding: 8px 14px; }
 .btn-sm { padding: 5px 12px; font-size: 12px; }
 
 /* ─── Tables ────────────────────────────────────────────── */

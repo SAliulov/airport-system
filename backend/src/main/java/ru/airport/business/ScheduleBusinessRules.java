@@ -17,8 +17,9 @@ import java.util.Objects;
  */
 public class ScheduleBusinessRules {
 
-    private static final String ROUTE_LOCKED_MESSAGE =
-            "Нельзя менять маршрут или периодичность: есть рейс в статусе DEPARTED, ARRIVED или CANCELLED";
+    private static final String LINKED_TEMPLATE_LOCKED_MESSAGE =
+            "Нельзя менять маршрут или периодичность: по шаблону уже созданы рейсы. "
+                    + "Удалите рейсы по шаблону и сгенерируйте их заново.";
 
     public void assertMayDelete(boolean hasFlights) {
         if (hasFlights) {
@@ -58,22 +59,9 @@ public class ScheduleBusinessRules {
                     "Нельзя деактивировать шаблон: есть рейсы в статусе SCHEDULED, DEPARTED или DELAYED.");
         }
 
-        boolean hasClosedFlight = linkedFlights.stream()
-                .map(Flight::getStatus)
-                .anyMatch(this::isRouteTimeLockedStatus);
-        if (!hasClosedFlight) {
-            return;
+        if (!linkedFlights.isEmpty() && routeOrTemplateChanged(existing, draft)) {
+            throw new ConflictException(LINKED_TEMPLATE_LOCKED_MESSAGE);
         }
-
-        if (routeOrTemplateChanged(existing, draft)) {
-            throw new ConflictException(ROUTE_LOCKED_MESSAGE);
-        }
-    }
-
-    private boolean isRouteTimeLockedStatus(FlightStatus status) {
-        return status == FlightStatus.DEPARTED
-                || status == FlightStatus.ARRIVED
-                || status == FlightStatus.CANCELLED;
     }
 
     private boolean hasOpenOperationalFlight(List<Flight> linkedFlights) {

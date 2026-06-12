@@ -1,5 +1,5 @@
 import type { ScheduleRs } from '../../../types';
-import { isoDayOfWeekFromDate, isoDayOfWeekLabel } from '../../../utils/airportTime';
+import { isoDayOfWeekFromDate, isoDayOfWeekLabel, todayAirportDate } from '../../../utils/airportTime';
 import { slotOptionLabel } from '../domain/flightFormatters';
 
 export interface CreateSlotOption {
@@ -45,6 +45,11 @@ export function FlightCreateModal({
   onSubmit,
 }: FlightCreateModalProps) {
   if (!open) return null;
+  const today = todayAirportDate();
+  const minOperationDate = selectedCreateSlot?.schedule.effectiveFrom
+    && selectedCreateSlot.schedule.effectiveFrom > today
+    ? selectedCreateSlot.schedule.effectiveFrom
+    : today;
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="flight-create-title">
@@ -87,7 +92,7 @@ export function FlightCreateModal({
           <input
             type="date"
             value={modalOperationDate}
-            min={selectedCreateSlot?.schedule.effectiveFrom}
+            min={minOperationDate}
             max={selectedCreateSlot?.schedule.effectiveTo || undefined}
             onChange={e => onModalOperationDateChange(e.target.value)}
           />
@@ -133,6 +138,10 @@ export function validateCreateFlightDate(
   selectedCreateSlot?: CreateSlotOption,
 ): string | null {
   if (!modalOperationDate) return 'Укажите дату операции.';
+  const today = todayAirportDate();
+  if (modalOperationDate < today) {
+    return `Дата операции не может быть раньше ${today} (MSK).`;
+  }
   if (selectedCreateSlot?.schedule.periodicityType === 'WEEKLY' && selectedCreateSlot.slot.dayOfWeek) {
     const dow = isoDayOfWeekFromDate(modalOperationDate);
     if (dow !== selectedCreateSlot.slot.dayOfWeek) {

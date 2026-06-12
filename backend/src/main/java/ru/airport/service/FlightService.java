@@ -7,6 +7,7 @@ import ru.airport.dto.DelayWarningRq;
 import ru.airport.dto.DelayWarningRs;
 import ru.airport.dto.FlightActualTimesRq;
 import ru.airport.dto.FlightAircraftAssignmentRq;
+import ru.airport.dto.FlightBulkDeleteRs;
 import ru.airport.dto.FlightGenerateRq;
 import ru.airport.dto.FlightGenerateRs;
 import ru.airport.dto.FlightRq;
@@ -137,5 +138,10 @@ public class FlightService {
     @Transactional
     public void delete(Integer id) {
         flightCommandService.delete(id);
+    }
+
+    @Transactional
+    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId) {
+        return flightCommandService.deleteBySchedule(scheduleId);
     }
 }

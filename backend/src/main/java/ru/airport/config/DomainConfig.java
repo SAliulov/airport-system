@@ -10,6 +10,7 @@ import ru.airport.business.FlightActualTimeRules;
 import ru.airport.business.FlightGenerationBusinessRules;
 import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.FlightMutationBusinessRules;
+import ru.airport.business.FlightPlanningTimeBusinessRules;
 import ru.airport.business.FlightStatusBusinessRules;
 import ru.airport.business.GateAssignmentBusinessRules;
 import ru.airport.business.GateBusinessRules;
@@ -39,6 +40,11 @@ public class DomainConfig {
     @Bean
     public FlightMutationBusinessRules flightMutationBusinessRules() {
         return new FlightMutationBusinessRules();
+    }
+
+    @Bean
+    public FlightPlanningTimeBusinessRules flightPlanningTimeBusinessRules() {
+        return new FlightPlanningTimeBusinessRules();
     }
 
     @Bean

@@ -6,8 +6,11 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.airport.business.FlightGenerationBusinessRules;
 import ru.airport.business.FlightHomeAirportRules;
 import ru.airport.business.FlightMutationBusinessRules;
+import ru.airport.business.FlightPlanningTimeBusinessRules;
 import ru.airport.business.ScheduleOccurrenceBusinessRules;
+import ru.airport.config.AirportClock;
 import ru.airport.config.AirportProperties;
+import ru.airport.dto.FlightBulkDeleteRs;
 import ru.airport.dto.FlightGenerateRq;
 import ru.airport.dto.FlightGenerateRs;
 import ru.airport.dto.FlightRq;
@@ -40,10 +43,12 @@ public class FlightCommandService {
     private final DtoMapper mapper;
     private final FlightMutationBusinessRules flightMutationBusinessRules;
     private final FlightGenerationBusinessRules flightGenerationBusinessRules;
+    private final FlightPlanningTimeBusinessRules flightPlanningTimeBusinessRules;
     private final ScheduleOccurrenceBusinessRules scheduleOccurrenceBusinessRules;
     private final FlightHomeAirportRules flightHomeAirportRules;
     private final RealtimeNotificationService realtimeNotificationService;
     private final AirportProperties airportProperties;
+    private final AirportClock airportClock;
     private final FlightQueryService flightQueryService;
 
     private String homeIata() {
@@ -60,11 +65,16 @@ public class FlightCommandService {
         scheduleOccurrenceBusinessRules.assertMatchesOperationDate(schedule, slot, rq.getOperationDate());
         flightHomeAirportRules.assertValidHomeRoute(schedule, homeIata());
         Flight flight = flightGenerationBusinessRules.buildFlight(schedule, slot, rq.getOperationDate());
+        flightPlanningTimeBusinessRules.assertScheduledDepartureInFuture(
+                flight.getScheduledDeparture(), airportClock.now());
         return mapper.toFlightRsSummary(flightRepository.save(flight));
     }
 
     @Transactional
     public FlightGenerateRs generate(FlightGenerateRq rq) {
+        var now = airportClock.now();
+        flightPlanningTimeBusinessRules.assertGenerationStartsTodayOrLater(
+                rq.getFromDate(), now.toLocalDate());
         List<Schedule> schedules;
         if (rq.getScheduleId() != null) {
             Schedule schedule = scheduleRepository.findByIdWithSlots(rq.getScheduleId()).stream()
@@ -82,7 +92,12 @@ public class FlightCommandService {
                 flightRepository::existsBySlot_SlotIdAndOperationDate);
 
         List<Integer> flightIds = new ArrayList<>();
+        int pastSkipped = 0;
         for (Flight draft : plan.toCreate()) {
+            if (!flightPlanningTimeBusinessRules.isScheduledDepartureInFuture(draft.getScheduledDeparture(), now)) {
+                pastSkipped++;
+                continue;
+            }
             flightHomeAirportRules.assertValidHomeRoute(draft.getSchedule(), homeIata());
             Flight saved = flightRepository.save(draft);
             flightIds.add(saved.getFlightId());
@@ -91,7 +106,7 @@ public class FlightCommandService {
 
         return FlightGenerateRs.builder()
                 .created(flightIds.size())
-                .skipped(plan.skipped())
+                .skipped(plan.skipped() + pastSkipped)
                 .flightIds(flightIds)
                 .build();
     }
@@ -111,5 +126,39 @@ public class FlightCommandService {
         flightMutationBusinessRules.assertFlightDeletable(flight.getStatus());
         touchCollections(flight);
         flightRepository.delete(flight);
+    }
+
+    @Transactional
+    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", scheduleId));
+        List<Flight> flights = flightRepository.findBySchedule_ScheduleId(schedule.getScheduleId());
+        List<Flight> blocked = flights.stream()
+                .filter(f -> {
+                    try {
+                        flightMutationBusinessRules.assertFlightDeletable(f.getStatus());
+                        return false;
+                    } catch (RuntimeException ex) {
+                        return true;
+                    }
+                })
+                .toList();
+        if (!blocked.isEmpty()) {
+            String details = blocked.stream()
+                    .map(f -> "#%d %s".formatted(f.getFlightId(), f.getStatus()))
+                    .limit(10)
+                    .reduce((a, b) -> a + "; " + b)
+                    .orElse("");
+            throw new ru.airport.exception.ConflictException(
+                    "Нельзя удалить все рейсы шаблона: есть рейсы не в статусах SCHEDULED/CANCELLED (" + details + ")");
+        }
+        for (Flight flight : flights) {
+            touchCollections(flight);
+        }
+        flightRepository.deleteAll(flights);
+        return FlightBulkDeleteRs.builder()
+                .scheduleId(schedule.getScheduleId())
+                .deleted(flights.size())
+                .build();
     }
 }

@@ -75,7 +75,8 @@
 }
 
 .modal-actions .btn-primary,
-.modal-actions .btn-ghost {
+.modal-actions .btn-ghost,
+.modal-actions .btn-danger {
   min-width: var(--btn-modal-min-width);
   padding: 10px 24px;
   font-size: 14px;

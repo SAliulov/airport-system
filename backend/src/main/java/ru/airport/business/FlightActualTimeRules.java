@@ -9,8 +9,6 @@ import java.time.LocalDateTime;
  */
 public class FlightActualTimeRules {
 
-    private static final int SCHEDULED_FUTURE_LEAD_MINUTES = 15;
-
     private final int maxFutureSkewMinutes;
 
     public FlightActualTimeRules(int maxFutureSkewMinutes) {
@@ -56,18 +54,11 @@ public class FlightActualTimeRules {
     }
 
     /**
-     * Для рейсов в будущем относительно MSK «сейчас» — baseline сдвигается к плановому якорю,
-     * чтобы диспетчер мог вводить факт в день операции.
+     * Якорь для проверки «не слишком далеко в будущем» — всегда «сейчас».
+     * Диспетчер может вводить фактические времена в день операции, но не раньше.
      */
     static LocalDateTime futureReference(LocalDateTime now, LocalDateTime scheduledAnchor) {
-        if (now == null) {
-            return null;
-        }
-        if (scheduledAnchor == null) {
-            return now;
-        }
-        LocalDateTime anchor = scheduledAnchor.minusMinutes(SCHEDULED_FUTURE_LEAD_MINUTES);
-        return anchor.isAfter(now) ? anchor : now;
+        return now;
     }
 
     private void assertSoftBounds(LocalDateTime actual, LocalDateTime scheduled, String label) {

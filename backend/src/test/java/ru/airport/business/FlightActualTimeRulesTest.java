@@ -6,7 +6,6 @@ import ru.airport.exception.BadRequestException;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FlightActualTimeRulesTest {
@@ -14,13 +13,14 @@ class FlightActualTimeRulesTest {
     private final FlightActualTimeRules rules = new FlightActualTimeRules(120);
 
     @Test
-    void futureSkewUsesScheduledAnchorWhenFlightIsInFuture() {
+    void futureSkewRejectsWhenFlightIsFarInFuture() {
         LocalDateTime now = LocalDateTime.of(2026, 5, 19, 12, 0);
         LocalDateTime scheduledDeparture = LocalDateTime.of(2026, 6, 16, 14, 0);
         LocalDateTime actualDeparture = LocalDateTime.of(2026, 6, 16, 14, 5);
 
-        assertThatCode(() -> rules.assertActualDeparture(actualDeparture, scheduledDeparture, now))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> rules.assertActualDeparture(actualDeparture, scheduledDeparture, now))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("120 мин");
     }
 
     @Test
@@ -35,10 +35,10 @@ class FlightActualTimeRulesTest {
     }
 
     @Test
-    void futureReferencePrefersScheduledLeadWhenLaterThanNow() {
+    void futureReferenceAlwaysReturnsNow() {
         LocalDateTime now = LocalDateTime.of(2026, 5, 19, 12, 0);
         LocalDateTime scheduled = LocalDateTime.of(2026, 6, 16, 14, 0);
         assertThat(FlightActualTimeRules.futureReference(now, scheduled))
-                .isEqualTo(scheduled.minusMinutes(15));
+                .isEqualTo(now);
     }
 }

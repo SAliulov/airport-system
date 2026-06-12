@@ -19,6 +19,7 @@ import ru.airport.dto.DelayWarningRq;
 import ru.airport.dto.DelayWarningRs;
 import ru.airport.dto.FlightActualTimesRq;
 import ru.airport.dto.FlightAircraftAssignmentRq;
+import ru.airport.dto.FlightBulkDeleteRs;
 import ru.airport.dto.GateRs;
 import ru.airport.dto.FlightGenerateRq;
 import ru.airport.dto.FlightGenerateRs;
@@ -114,6 +115,11 @@ public class FlightController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable("id") Integer id) {
         flightService.delete(id);
+    }
+
+    @DeleteMapping("/by-schedule/{scheduleId}")
+    public FlightBulkDeleteRs deleteBySchedule(@PathVariable("scheduleId") Integer scheduleId) {
+        return flightService.deleteBySchedule(scheduleId);
     }
 
     @PutMapping("/{id}/status")

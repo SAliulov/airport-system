@@ -81,3 +81,8 @@ export interface FlightGenerateRs {
   skipped: number;
   flightIds: number[];
 }
+
+export interface FlightBulkDeleteRs {
+  scheduleId: number;
+  deleted: number;
+}

@@ -169,9 +169,6 @@ export function ScheduleFormModal({
           <div className="modal-form-row">
             <div className="modal-field">
               <span className="modal-field__label">Периодичность</span>
-              <p className="modal-hint">
-                INTERVAL — один слот в день по шагу; два рейса в день — два шаблона с разными номерами.
-              </p>
               <select
                 className={ic('periodicityType')}
                 value={form.periodicityType}
@@ -208,18 +205,12 @@ export function ScheduleFormModal({
               />
               <span className="modal-field__checkbox-text">
                 Активный шаблон
-                <p className="modal-field__checkbox-hint">
-                  Нельзя снять активность, если по шаблону уже созданы рейсы — сначала удалите рейсы.
-                </p>
               </span>
             </label>
           </div>
 
           <div className="modal-field">
             <span className="modal-field__label">Слоты</span>
-            <p className="modal-hint">
-              День недели слота должен попадать в период действия шаблона — иначе при сохранении будет ошибка.
-            </p>
             {form.slots.map((slot, index) => (
               <div key={index} className="modal-form-row modal-form-row--slot">
                 {form.periodicityType === 'WEEKLY' && (
