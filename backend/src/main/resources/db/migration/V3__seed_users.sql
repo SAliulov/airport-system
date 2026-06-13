@@ -1,6 +1,4 @@
--- Учётные записи из test-credentials.md (BCrypt, DelegatingPasswordEncoder).
--- operator_eugene  — READ_ONLY (мобильный оператор)
--- dispatcher_zhenya — DISPATCHER
+-- Учётные записи (BCrypt, DelegatingPasswordEncoder)
 
 INSERT INTO app_user (username, password_hash, role) VALUES
     (
@@ -12,7 +10,9 @@ INSERT INTO app_user (username, password_hash, role) VALUES
         'dispatcher_zhenya',
         '{bcrypt}$2a$12$GapINjMkW8.zQKMZNOEP7.RAnBE/bNCOXAcUy4taXyWOmWQrAh/sq',
         'DISPATCHER'
-    )
-ON CONFLICT (username) DO UPDATE SET
-    password_hash = EXCLUDED.password_hash,
-    role = EXCLUDED.role;
+    ),
+    (
+        'Диспетчер_Женя1987',
+        '{bcrypt}$2a$12$G51sxBUq7a8fi3Uep8Nwj.KABhgNBVJtAVGXX7h.yDXB4f8rdHr/G',
+        'DISPATCHER'
+    );

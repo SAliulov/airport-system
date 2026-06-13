@@ -50,52 +50,9 @@ UPDATE flight f SET
         WHERE sl.schedule_id = f.schedule_id
         LIMIT 1
     )
+    
 FROM schedule s
 WHERE f.schedule_id = s.schedule_id;
-
--- Legacy: несколько flight на один schedule_id → один (slot_id, operation_date).
--- Сохраняем строку с минимальным flight_id; зависимости удаляем каскадно через FK.
-DELETE FROM delay_warning dw
-WHERE dw.flight_id IN (
-    SELECT f.flight_id
-    FROM flight f
-    INNER JOIN (
-        SELECT slot_id, operation_date, MIN(flight_id) AS keep_id
-        FROM flight
-        WHERE slot_id IS NOT NULL AND operation_date IS NOT NULL
-        GROUP BY slot_id, operation_date
-        HAVING COUNT(*) > 1
-    ) dup ON f.slot_id = dup.slot_id
-        AND f.operation_date = dup.operation_date
-        AND f.flight_id <> dup.keep_id
-);
-
-DELETE FROM gate_assignment ga
-WHERE ga.flight_id IN (
-    SELECT f.flight_id
-    FROM flight f
-    INNER JOIN (
-        SELECT slot_id, operation_date, MIN(flight_id) AS keep_id
-        FROM flight
-        WHERE slot_id IS NOT NULL AND operation_date IS NOT NULL
-        GROUP BY slot_id, operation_date
-        HAVING COUNT(*) > 1
-    ) dup ON f.slot_id = dup.slot_id
-        AND f.operation_date = dup.operation_date
-        AND f.flight_id <> dup.keep_id
-);
-
-DELETE FROM flight f
-USING (
-    SELECT slot_id, operation_date, MIN(flight_id) AS keep_id
-    FROM flight
-    WHERE slot_id IS NOT NULL AND operation_date IS NOT NULL
-    GROUP BY slot_id, operation_date
-    HAVING COUNT(*) > 1
-) dup
-WHERE f.slot_id = dup.slot_id
-  AND f.operation_date = dup.operation_date
-  AND f.flight_id <> dup.keep_id;
 
 ALTER TABLE schedule
     ALTER COLUMN effective_from SET NOT NULL;
