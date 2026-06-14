@@ -69,7 +69,6 @@ public class ScheduleSlotBusinessRules {
         }
 
         PeriodicityType type = schedule.getPeriodicityType();
-        int step = schedule.getPeriodicityStep() != null ? schedule.getPeriodicityStep() : 1;
 
         if (type == PeriodicityType.WEEKLY) {
             if (dayOfWeek == null) {
@@ -88,12 +87,7 @@ public class ScheduleSlotBusinessRules {
         }
 
         if (type == PeriodicityType.INTERVAL) {
-            for (LocalDate d = effectiveFrom; !d.isAfter(effectiveTo); d = d.plusDays(step)) {
-                return;
-            }
-            throw new BadRequestException(
-                    "Интервальный слот не попадает в период действия расписания (с %s по %s)"
-                            .formatted(effectiveFrom, effectiveTo));
+            return;
         }
     }
 }

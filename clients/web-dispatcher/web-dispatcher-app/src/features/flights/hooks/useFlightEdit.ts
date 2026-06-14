@@ -174,8 +174,13 @@ export function useFlightEdit({ onSaved, setPageError, setGates, setAircraftType
     const delayFieldsActive =
       statusNew === 'DELAYED' || (editDetail.status === 'DELAYED' && !statusNew);
     const delayPending = delayFieldsActive && Boolean(delayForm.delayMinutes);
+    const isActualTimeEditable = editDetail.status === 'SCHEDULED' || editDetail.status === 'DELAYED';
+    const actualTimesChanged = isActualTimeEditable && (
+      statusActualDeparture !== toDatetimeLocalValue(editDetail.actualDeparture) ||
+      statusActualArrival !== toDatetimeLocalValue(editDetail.actualArrival)
+    );
 
-    if (!aircraftChanged && !gatePending && !statusPending && !delayPending) {
+    if (!aircraftChanged && !gatePending && !statusPending && !delayPending && !actualTimesChanged) {
       setModalError('Нет изменений для сохранения. Измените поля в форме и нажмите «Применить».');
       return;
     }
@@ -244,6 +249,25 @@ export function useFlightEdit({ onSaved, setPageError, setGates, setAircraftType
           delayMinutes: Number(delayForm.delayMinutes),
           reason: delayForm.reason || undefined,
         });
+      }
+
+      if (actualTimesChanged && !statusPending) {
+        const body: { status: string; actualDeparture?: string; actualArrival?: string } = {
+          status: editDetail.status,
+        };
+        if (statusActualDeparture !== toDatetimeLocalValue(editDetail.actualDeparture)) {
+          const actualDeparture = fromDatetimeLocalValue(statusActualDeparture);
+          if (actualDeparture) {
+            body.actualDeparture = actualDeparture;
+          }
+        }
+        if (statusActualArrival !== toDatetimeLocalValue(editDetail.actualArrival)) {
+          const actualArrival = fromDatetimeLocalValue(statusActualArrival);
+          if (actualArrival) {
+            body.actualArrival = actualArrival;
+          }
+        }
+        await updateFlightStatus(flightId, body);
       }
 
       cancelEdit();

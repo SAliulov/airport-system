@@ -19,10 +19,6 @@ public class AirportClock {
         this.zoneId = ZoneId.of(properties.getTimezone());
     }
 
-    public ZoneId getZoneId() {
-        return zoneId;
-    }
-
     public Instant nowInstant() {
         return Instant.now();
     }

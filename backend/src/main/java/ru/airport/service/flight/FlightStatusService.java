@@ -110,9 +110,25 @@ public class FlightStatusService {
             if (closingTime != null && active != null) {
                 active.setAssignedTo(closingTime);
                 if (!active.getAssignedFrom().isBefore(active.getAssignedTo())) {
-                    // Используем константу вместо магической единицы
                     active.setAssignedTo(active.getAssignedFrom().plusMinutes(MINIMAL_GATE_INTERVAL_DURATION_MINUTES));
                 }
+            }
+        }
+
+        // Same-status actual time update (SCHEDULED/DELAYED → same status + actual times)
+        if (rq.getStatus() == flight.getStatus()
+                && rq.getStatus() != FlightStatus.DEPARTED
+                && rq.getStatus() != FlightStatus.ARRIVED
+                && rq.getStatus() != FlightStatus.CANCELLED) {
+            if (rq.getActualDeparture() != null) {
+                flightActualTimeRules.assertActualDeparture(
+                        rq.getActualDeparture(), flight.getScheduledDeparture(), kind, now);
+                flight.setActualDeparture(rq.getActualDeparture());
+            }
+            if (rq.getActualArrival() != null) {
+                flightActualTimeRules.assertActualArrival(
+                        rq.getActualArrival(), flight.getActualDeparture(), flight.getScheduledArrival(), kind, now);
+                flight.setActualArrival(rq.getActualArrival());
             }
         }
 
