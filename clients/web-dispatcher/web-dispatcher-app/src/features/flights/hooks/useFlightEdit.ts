@@ -250,6 +250,7 @@ export function useFlightEdit({ onSaved, setPageError, setGates, setAircraftType
       onSaved();
     } catch (e: unknown) {
       setModalError(formatApiError(e));
+      if (editDetail) syncEditFormFromDetail(editDetail, false);
     } finally {
       setEditSaving(false);
     }

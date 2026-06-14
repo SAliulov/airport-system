@@ -5,8 +5,6 @@ import { toDatetimeLocalValue } from '../../../utils/airportTime';
 /** Ранг категории размера ВС (совместимость с SizeCategory.isCompatible на backend). */
 const SIZE_RANK: Record<SizeCategory, number> = { NARROW: 0, WIDE: 1, JUMBO: 2 };
 
-export type FlightDirection = 'outbound' | 'inbound' | null;
-
 export interface GateFormValues {
   gateId: string;
   assignedFrom: string;

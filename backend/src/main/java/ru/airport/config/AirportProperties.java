@@ -14,10 +14,13 @@ public class AirportProperties {
 
     private String homeIata = "SVO";
     private String timezone = "Europe/Moscow";
+
     /** Окно ±N часов вокруг планового вылета/прилёта для интервала гейта. */
     private int gatePlanWindowHours = 12;
+
     /** Минуты после assigned_to, в которые допустим факт вылета/прилёта у гейта. */
     private int gatePostGraceMinutes = 15;
+
     private Scheduler scheduler = new Scheduler();
 
     @Getter
@@ -28,5 +31,11 @@ public class AirportProperties {
         private int inboundGateDelayMinutes = 5;
         private int autoCancelHoursAfterScheduledDeparture = 24;
         private int maxActualTimeFutureSkewMinutes = 120;
+
+        // Исключаем магические числа: настраиваемые мягкие границы для фактического времени
+        private int maxDepartureEarlyHours = 24;
+        private int maxDepartureLateHours = 48;
+        private int maxArrivalEarlyHours = 24;
+        private int maxArrivalLateHours = 48;
     }
 }

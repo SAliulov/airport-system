@@ -26,6 +26,21 @@ export function useFlightWebSocket({
         const msg = JSON.parse(body) as Record<string, unknown>;
         if (topic === '/topic/flights' && msg.flightId) {
           const fid = Number(msg.flightId);
+          const eventType = (msg._eventType as string | undefined) ?? 'UPDATED';
+
+          if (eventType === 'DELETED') {
+            setFlights(prev => prev.filter(f => f.flightId !== fid));
+            return;
+          }
+
+          if (eventType === 'CREATED') {
+            setFlights(prev => {
+              if (prev.some(f => f.flightId === fid)) return prev;
+              return [...prev, msg as unknown as FlightRs];
+            });
+            return;
+          }
+
           highlight(fid);
           setFlights(prev =>
             prev.map(fl =>

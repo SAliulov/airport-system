@@ -65,7 +65,7 @@ public class ScheduleExportService {
             Sheet sh = wb.createSheet("Flights");
             Row h = sh.createRow(0);
             String[] headers = {
-                    "Flight", "Airline", "From", "To", "Departure", "Arrival", "Status", "Gate"
+                    "Рейс", "Авиакомпания", "Откуда", "Куда", "Отправка", "Прибытие", "Статус", "Гейт"
             };
             for (int i = 0; i < headers.length; i++) {
                 h.createCell(i).setCellValue(headers[i]);

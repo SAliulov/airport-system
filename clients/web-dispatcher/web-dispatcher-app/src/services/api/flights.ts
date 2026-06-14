@@ -10,11 +10,8 @@ import type {
   GateAssignmentRq,
 } from '../../types/requests';
 import type {
-  AircraftTypeRs,
-  DelayWarningRs,
   FlightRs,
   GateAssignmentRs,
-  GateRs,
   PageRs,
 } from '../../types';
 
@@ -60,20 +57,11 @@ export const searchFlights = (query: string, params?: FlightListParams) =>
 export const getFlightById = (id: number) =>
   apiClient.get<FlightRs>(`/flights/${id}`).then(r => r.data);
 
-export const getAvailableGates = (flightId: number) =>
-  apiClient.get<GateRs[]>(`/flights/${flightId}/available-gates`).then(r => r.data);
-
-export const getCompatibleAircraftTypes = (flightId: number) =>
-  apiClient.get<AircraftTypeRs[]>(`/flights/${flightId}/compatible-aircraft-types`).then(r => r.data);
-
 export const createFlight = (d: CreateFlightRq) =>
   apiClient.post<FlightRs>('/flights', d, { headers: authHeaders() }).then(r => r.data);
 
 export const generateFlights = (d: FlightGenerateRq) =>
   apiClient.post<FlightGenerateRs>('/flights/generate', d, { headers: authHeaders() }).then(r => r.data);
-
-export const updateFlight = (id: number, d: CreateFlightRq) =>
-  apiClient.put<FlightRs>(`/flights/${id}`, d, { headers: authHeaders() }).then(r => r.data);
 
 export const deleteFlight = (id: number) =>
   apiClient.delete(`/flights/${id}`, { headers: authHeaders() });
@@ -97,9 +85,6 @@ export const assignAircraft = (id: number, aircraftTypeId: number) =>
 
 export const assignGate = (id: number, d: GateAssignmentRq) =>
   apiClient.post<GateAssignmentRs>(`/flights/${id}/gate-assignment`, d, { headers: authHeaders() }).then(r => r.data);
-
-export const getDelayWarnings = (flightId: number) =>
-  apiClient.get<DelayWarningRs[]>(`/flights/${flightId}/delay-warnings`).then(r => r.data);
 
 export const createDelayWarning = (flightId: number, d: DelayWarningRq) =>
   apiClient.post<DelayWarningRs>(

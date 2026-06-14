@@ -2,18 +2,13 @@ import { API_BASE } from '../../config';
 import { backendErrorText, statusText } from '../http/client';
 import { getToken } from '../auth';
 
-/** URL экспорта расписания (для отладки). */
-export function exportUrl(format: 'pdf' | 'excel', date: string) {
-  return `${API_BASE}/api/v1/schedules/export/${format}?date=${encodeURIComponent(date)}`;
-}
-
 /** Скачивание PDF/Excel расписания на день с JWT. */
 export async function downloadScheduleExport(format: 'pdf' | 'excel', date: string): Promise<void> {
   const token = getToken();
   if (!token) {
     throw new Error('Требуется авторизация');
   }
-  const res = await fetch(exportUrl(format, date), {
+  const res = await fetch(`${API_BASE}/api/v1/schedules/export/${format}?date=${encodeURIComponent(date)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

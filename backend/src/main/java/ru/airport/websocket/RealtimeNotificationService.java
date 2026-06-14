@@ -7,6 +7,8 @@ import ru.airport.dto.DelayWarningRs;
 import ru.airport.dto.FlightRs;
 import ru.airport.dto.GateAssignmentRs;
 import ru.airport.event.DelayWarningEvent;
+import ru.airport.event.FlightCreatedEvent;
+import ru.airport.event.FlightDeletedEvent;
 import ru.airport.event.FlightUpdateEvent;
 import ru.airport.event.GateChangeEvent;
 import ru.airport.event.OperationalEvent;
@@ -23,6 +25,14 @@ public class RealtimeNotificationService {
 
     public void publishFlightUpdate(FlightRs flight) {
         eventPublisher.publishEvent(new FlightUpdateEvent(flight));
+    }
+
+    public void publishFlightCreated(FlightRs flight) {
+        eventPublisher.publishEvent(new FlightCreatedEvent(flight));
+    }
+
+    public void publishFlightDeleted(Integer flightId) {
+        eventPublisher.publishEvent(new FlightDeletedEvent(flightId));
     }
 
     public void publishDelayWarning(Integer flightId, DelayWarningRs warning) {

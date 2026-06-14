@@ -31,6 +31,8 @@ import static ru.airport.service.flight.FlightQuerySupport.touchCollections;
 @Service
 @RequiredArgsConstructor
 public class FlightStatusService {
+    // Минимальный шаг для усечения интервала гейта
+    private static final long MINIMAL_GATE_INTERVAL_DURATION_MINUTES = 1L;
 
     private final FlightRepository flightRepository;
     private final DtoMapper mapper;
@@ -53,9 +55,11 @@ public class FlightStatusService {
         Flight flight = flightQueryService.loadFlight(flightId);
         flightMutationBusinessRules.assertFlightEditable(flight.getStatus());
         touchCollections(flight);
+        
         Schedule schedule = flight.getSchedule();
         FlightHomeAirportRules.OperationKind kind =
                 flightHomeAirportRules.resolveOperationKind(schedule, homeIata());
+        
         flightStatusBusinessRules.assertManualTransition(flight.getStatus(), rq.getStatus(), kind);
 
         LocalDateTime now = airportClock.now();
@@ -64,8 +68,11 @@ public class FlightStatusService {
             LocalDateTime actualDeparture = rq.getActualDeparture() != null
                     ? rq.getActualDeparture()
                     : (flight.getActualDeparture() != null ? flight.getActualDeparture() : now);
+            
+            // ПЕРЕДАЕМ контекст 'kind' для точечной валидации времени
             flightActualTimeRules.assertActualDeparture(
-                    actualDeparture, flight.getScheduledDeparture(), now);
+                    actualDeparture, flight.getScheduledDeparture(), kind, now);
+            
             if (kind == FlightHomeAirportRules.OperationKind.DEPARTURE) {
                 flightHomeAirportRules.assertManualTransitionToDeparted(flight, homeIata(), actualDeparture);
                 GateAssignment active = flight.getActiveGateAssignment();
@@ -75,12 +82,16 @@ public class FlightStatusService {
                 flightHomeAirportRules.assertManualInboundDeparture(flight, homeIata(), actualDeparture);
             }
             flight.setActualDeparture(actualDeparture);
+
         } else if (rq.getStatus() == FlightStatus.ARRIVED) {
             LocalDateTime actualArrival = rq.getActualArrival() != null
                     ? rq.getActualArrival()
                     : flight.getActualArrival();
+            
+            // ПЕРЕДАЕМ контекст 'kind' для точечной валидации времени
             flightActualTimeRules.assertActualArrival(
-                    actualArrival, flight.getActualDeparture(), flight.getScheduledArrival(), now);
+                    actualArrival, flight.getActualDeparture(), flight.getScheduledArrival(), kind, now);
+            
             if (kind == FlightHomeAirportRules.OperationKind.ARRIVAL) {
                 flightHomeAirportRules.assertManualTransitionToArrived(flight, homeIata(), actualArrival);
                 GateAssignment active = flight.getActiveGateAssignment();
@@ -92,9 +103,17 @@ public class FlightStatusService {
             if (actualArrival != null) {
                 flight.setActualArrival(actualArrival);
             }
+
         } else if (rq.getStatus() == FlightStatus.CANCELLED) {
             GateAssignment active = flight.getActiveGateAssignment();
-            gateAssignmentBusinessRules.closeActiveAssignmentAt(active, now);
+            LocalDateTime closingTime = gateAssignmentBusinessRules.computeActiveAssignmentClosingTime(active, now);
+            if (closingTime != null && active != null) {
+                active.setAssignedTo(closingTime);
+                if (!active.getAssignedFrom().isBefore(active.getAssignedTo())) {
+                    // Используем константу вместо магической единицы
+                    active.setAssignedTo(active.getAssignedFrom().plusMinutes(MINIMAL_GATE_INTERVAL_DURATION_MINUTES));
+                }
+            }
         }
 
         flight.setStatus(rq.getStatus());
@@ -118,11 +137,17 @@ public class FlightStatusService {
                 ? rq.getActualArrival()
                 : flight.getActualArrival();
 
+        Schedule schedule = flight.getSchedule();
+        FlightHomeAirportRules.OperationKind kind = 
+                flightHomeAirportRules.resolveOperationKind(schedule, homeIata());
+
         LocalDateTime now = airportClock.now();
+        
+        // Исправлено: теперь коррекция старых времён тоже учитывает направление полёта
         flightActualTimeRules.assertCorrection(
                 mergedDeparture, mergedArrival,
                 flight.getScheduledDeparture(), flight.getScheduledArrival(),
-                now);
+                kind, now);
 
         if (rq.getActualDeparture() != null) {
             flight.setActualDeparture(rq.getActualDeparture());

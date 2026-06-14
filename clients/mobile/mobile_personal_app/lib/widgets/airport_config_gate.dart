@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/airport_config.dart';
 import '../services/airport_config_service.dart';
 
-typedef AirportConfigReady = void Function(AirportConfig config);
-
 /// Блокирует приложение до загрузки конфигурации аэропорта.
 class AirportConfigGate extends StatefulWidget {
   final Widget Function(AirportConfig config) builder;

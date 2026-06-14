@@ -7,17 +7,20 @@ import '../models/realtime_event.dart';
 
 typedef EventCallback = void Function(RealtimeEvent event);
 typedef OperationalEventCallback = void Function(OperationalEvent event);
+typedef ConnectionStateCallback = void Function(bool connected);
 
-/// STOMP-подключение к backend.
+/// STOMP-подключение к backend через raw WebSocket.
 /// Рейсы: /topic/flights, /topic/delays, /topic/gate-changes.
-/// Журнал: /topic/operational-events — session-scoped (накопление в RAM, без отписки при смене вкладки).
+/// Журнал: /topic/operational-events — session-scoped.
 class StompService {
   StompClient? _client;
   final List<EventCallback> _listeners = [];
   final List<OperationalEventCallback> _operationalListeners = [];
+  final List<ConnectionStateCallback> _connectionListeners = [];
   bool _connected = false;
   bool _operationalSubscriptionDesired = false;
   StompUnsubscribe? _operationalUnsubscribe;
+  bool _pendingReconnect = false;
 
   bool get isConnected => _connected;
 
@@ -29,18 +32,51 @@ class StompService {
   void removeOperationalListener(OperationalEventCallback cb) =>
       _operationalListeners.remove(cb);
 
+  void addConnectionListener(ConnectionStateCallback cb) =>
+      _connectionListeners.add(cb);
+  void removeConnectionListener(ConnectionStateCallback cb) =>
+      _connectionListeners.remove(cb);
+
+  void _notifyConnectionState(bool connected) {
+    for (final cb in _connectionListeners) {
+      cb(connected);
+    }
+  }
+
   void connect() {
     if (_client != null) return;
 
+    final uri = Uri.parse(AppConfig.apiBase);
+    final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
+    final wsPort = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    final wsUrl = '$wsScheme://${uri.host}:$wsPort/ws/raw';
+
     _client = StompClient(
-      config: StompConfig.sockJS(
-        url: '${AppConfig.apiBase}/ws',
+      config: StompConfig(
+        url: wsUrl,
         onConnect: _onConnect,
         onDisconnect: (_) {
           _connected = false;
           _operationalUnsubscribe = null;
+          _notifyConnectionState(false);
         },
-        onWebSocketError: (_) => _connected = false,
+        onStompError: (frame) {
+          _connected = false;
+          _notifyConnectionState(false);
+        },
+        onWebSocketError: (error) {
+          _connected = false;
+          _notifyConnectionState(false);
+          if (!_pendingReconnect) {
+            _pendingReconnect = true;
+            Future.delayed(const Duration(seconds: 5), () {
+              _pendingReconnect = false;
+              if (_client != null && !_connected) {
+                _client!.activate();
+              }
+            });
+          }
+        },
         reconnectDelay: const Duration(seconds: 5),
       ),
     );
@@ -49,6 +85,8 @@ class StompService {
 
   void _onConnect(StompFrame frame) {
     _connected = true;
+    _pendingReconnect = false;
+    _notifyConnectionState(true);
 
     _client!.subscribe(
       destination: '/topic/delays',
@@ -68,7 +106,6 @@ class StompService {
     }
   }
 
-  /// Однократная подписка на журнал; остаётся активной до [disconnect].
   void subscribeOperationalEvents() {
     _operationalSubscriptionDesired = true;
     if (_operationalUnsubscribe != null) return;
@@ -93,7 +130,7 @@ class StompService {
   }
 
   void _onOperationalEvent(StompFrame frame) {
-    if (frame.body == null) return;
+    if (frame.body == null || frame.body!.isEmpty) return;
     try {
       final json = jsonDecode(frame.body!) as Map<String, dynamic>;
       final event = OperationalEvent.fromJson(json);
@@ -101,11 +138,7 @@ class StompService {
         cb(event);
       }
     } catch (e) {
-      assert(() {
-        // ignore: avoid_print
-        print('operational-events parse error: $e body=${frame.body}');
-        return true;
-      }());
+      // ignore malformed payloads in release
     }
   }
 
@@ -147,5 +180,6 @@ class StompService {
     _client?.deactivate();
     _client = null;
     _connected = false;
+    _notifyConnectionState(false);
   }
 }

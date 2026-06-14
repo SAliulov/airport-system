@@ -3,13 +3,13 @@ import { getAirportTimezone } from './airportRuntime';
 const NAIVE_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/;
 
 /** Parse API naive local datetime without browser timezone shift. */
-export function parseNaiveWall(value: string): { y: string; mo: string; d: string; h: string; mi: string } | null {
+function parseNaiveWall(value: string): { y: string; mo: string; d: string; h: string; mi: string } | null {
   const match = value.trim().match(NAIVE_DATE_TIME);
   if (!match) return null;
   return { y: match[1], mo: match[2], d: match[3], h: match[4], mi: match[5] };
 }
 
-export function todayAirportDateInTz(timezone: string, at: Date = new Date()): string {
+function todayAirportDateInTz(timezone: string, at: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(at);
 }
 

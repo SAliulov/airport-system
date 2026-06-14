@@ -125,6 +125,13 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const Spacer(),
+                  Text(
+                    '#${f.flightId}',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),

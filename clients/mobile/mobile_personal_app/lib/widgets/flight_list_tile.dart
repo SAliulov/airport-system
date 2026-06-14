@@ -26,7 +26,22 @@ class FlightListTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         onTap: onTap,
-        title: Text(flight.flightNumber, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text.rich(
+          TextSpan(
+            text: flight.flightNumber,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(
+                text: ' #${flight.flightId}',
+                style: TextStyle(
+                  fontWeight: FontWeight.normal,
+                  fontSize: 12,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
         subtitle: Text(
           '${flight.route}\n${directionLabel(direction)}: ${AirportTime.formatDateTime(scheduledIso, timezone: config.timezone)}',
         ),

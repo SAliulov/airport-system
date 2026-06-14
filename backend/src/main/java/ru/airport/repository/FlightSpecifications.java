@@ -34,6 +34,8 @@ public final class FlightSpecifications {
      * @param flightNumberQuery       подстрока номера рейса (LIKE, lower case) или null
      * @param terminal                активный гейт рейса в терминале или null
      * @param hourWindowStart/hourWindowEnd дополнительное окно по scheduledDeparture или null
+     * @param originIata              фильтр по аэропорту отправления или null
+     * @param destinationIata         фильтр по аэропорту назначения или null
      */
     public static Specification<Flight> forApiList(
             LocalDateTime dayStart,
@@ -43,7 +45,9 @@ public final class FlightSpecifications {
             String flightNumberQuery,
             String terminal,
             LocalDateTime hourWindowStart,
-            LocalDateTime hourWindowEnd) {
+            LocalDateTime hourWindowEnd,
+            String originIata,
+            String destinationIata) {
         return (root, query, cb) -> {
             if (query != null) {
                 query.distinct(true);
@@ -78,6 +82,14 @@ public final class FlightSpecifications {
             }
             if (terminal != null && !terminal.isBlank()) {
                 predicates.add(activeGateTerminalEquals(root, query, cb, terminal.trim()));
+            }
+            if (originIata != null) {
+                predicates.add(cb.equal(
+                        cb.upper(cb.trim(scheduleJoin.get("originAirport"))), originIata));
+            }
+            if (destinationIata != null) {
+                predicates.add(cb.equal(
+                        cb.upper(cb.trim(scheduleJoin.get("destinationAirport"))), destinationIata));
             }
 
             return predicates.isEmpty()

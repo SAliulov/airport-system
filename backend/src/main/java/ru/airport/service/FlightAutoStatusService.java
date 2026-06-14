@@ -20,14 +20,18 @@ import java.util.List;
 @Slf4j
 public class FlightAutoStatusService {
 
-    public static final String AUTO_DELAY_REASON =
-            "[AUTO] Превышено плановое время ожидания вылета (диспетчер не перевёл рейс в DEPARTED)";
-    public static final String AUTO_INBOUND_GATE_DELAY_REASON =
-            "[AUTO] Не назначен гейт к плановому прилёту в базовый аэропорт";
-    public static final String AUTO_INBOUND_MISSED_DEPARTURE_REASON =
-            "[AUTO] Не назначен тип ВС к плановому вылету из аэропорта отправления";
-    public static final String AUTO_CANCEL_REASON =
-            "[AUTO] Рейс не выполнен к плановому вылету";
+    public static final String AUTO_OUTBOUND_DELAY_REASON =
+            "[Auto] Диспетчер проспал";
+    public static final String AUTO_INBOUND_ARRIVAL_DELAY_REASON =
+            "[Auto] Не введено фактическое время прибытия и не назначен гейт";
+    public static final String AUTO_INBOUND_DEPARTURE_REASON =
+            "[Auto] Автоматический вылет из аэропорта отправления (рейс в пути)";
+    public static final String AUTO_INBOUND_CANCEL_REASON =
+            "[Auto] Рейс задержан более 24 часов — автоматическая отмена";
+    public static final String AUTO_OUTBOUND_CANCEL_REASON =
+            "[Auto] Рейс не выполнен к плановому вылету";
+    public static final String AUTO_OUTBOUND_ARRIVAL_REASON =
+            "[Auto] Автоматическое прибытие по плановому времени";
 
     private final FlightRepository flightRepository;
     private final FlightAutoStatusProcessor flightAutoStatusProcessor;

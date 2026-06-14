@@ -12,7 +12,3 @@ export function isNetworkErrorMessage(message: string | null | undefined): boole
   const m = message.toLowerCase();
   return m.includes('ошибка сети') || m.includes('network error') || m === 'network error';
 }
-
-export function isNetworkError(e: unknown): boolean {
-  return isNetworkErrorMessage(formatApiError(e));
-}

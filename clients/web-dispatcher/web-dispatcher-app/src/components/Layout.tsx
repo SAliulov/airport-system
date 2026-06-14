@@ -11,6 +11,7 @@ const NAV = [
   { to: '/aircraft-types', label: 'Типы ВС' },
   { to: '/gates', label: 'Гейты' },
   { to: '/timeline', label: 'Таймлайн' },
+  { to: '/faq', label: 'Справка / FAQ' },
 ];
 
 export default function Layout() {

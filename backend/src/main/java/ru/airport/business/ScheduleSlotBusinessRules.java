@@ -6,7 +6,6 @@ import ru.airport.model.PeriodicityType;
 import ru.airport.model.Schedule;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -64,18 +63,13 @@ public class ScheduleSlotBusinessRules {
             return;
         }
 
-        PeriodicityType type = schedule.getPeriodicityType();
-        int step = schedule.getPeriodicityStep() != null ? schedule.getPeriodicityStep() : 1;
-
+        // Открытое расписание (без даты окончания) — никаких ограничений на DOW
         if (effectiveTo == null) {
-            if (type == PeriodicityType.WEEKLY && dayOfWeek != null
-                    && effectiveFrom.getDayOfWeek().getValue() != dayOfWeek) {
-                throw new BadRequestException(
-                        "Слот для дня недели %d не совпадает с датой начала действия шаблона (%s)"
-                                .formatted(dayOfWeek, effectiveFrom));
-            }
             return;
         }
+
+        PeriodicityType type = schedule.getPeriodicityType();
+        int step = schedule.getPeriodicityStep() != null ? schedule.getPeriodicityStep() : 1;
 
         if (type == PeriodicityType.WEEKLY) {
             if (dayOfWeek == null) {
@@ -87,20 +81,18 @@ public class ScheduleSlotBusinessRules {
             }
             if (first.isAfter(effectiveTo)) {
                 throw new BadRequestException(
-                        "Слот для дня недели %d не попадает в короткий период действия расписания (с %s по %s)"
+                        "Слот для дня недели %d не попадает в период действия расписания (с %s по %s)"
                                 .formatted(dayOfWeek, effectiveFrom, effectiveTo));
             }
             return;
         }
 
         if (type == PeriodicityType.INTERVAL) {
-            for (LocalDate d = effectiveFrom; !d.isAfter(effectiveTo); d = d.plusDays(1)) {
-                if (ChronoUnit.DAYS.between(effectiveFrom, d) % step == 0) {
-                    return;
-                }
+            for (LocalDate d = effectiveFrom; !d.isAfter(effectiveTo); d = d.plusDays(step)) {
+                return;
             }
             throw new BadRequestException(
-                    "Интервальный слот не попадает в короткий период действия расписания (с %s по %s)"
+                    "Интервальный слот не попадает в период действия расписания (с %s по %s)"
                             .formatted(effectiveFrom, effectiveTo));
         }
     }

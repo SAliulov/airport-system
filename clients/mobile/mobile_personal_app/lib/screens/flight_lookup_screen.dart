@@ -56,6 +56,21 @@ class _FlightLookupScreenState extends State<FlightLookupScreen> {
   void _onEvent(RealtimeEvent e) {
     if (!mounted) return;
 
+    final eventType = e.payload?['_eventType']?.toString() ?? 'UPDATED';
+
+    if (eventType == 'DELETED') {
+      setState(() => _flights.removeWhere((f) => f.flightId == e.flightId));
+      return;
+    }
+
+    if (eventType == 'CREATED' && e.payload != null) {
+      final detail = FlightDetail.fromJson(e.payload!);
+      if (!_flights.any((f) => f.flightId == detail.flightId)) {
+        setState(() => _flights.add(detail));
+      }
+      return;
+    }
+
     if (e.type == EventType.delay) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${e.title}: ${e.subtitle}')),
@@ -155,7 +170,16 @@ class _FlightLookupScreenState extends State<FlightLookupScreen> {
       ),
       body: Column(
         children: [
-          RealtimeEventChipBar(events: _events),
+          RealtimeEventChipBar(
+            events: _events,
+            onChipTap: (e) {
+              if (e.flightId > 0) {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => FlightDetailScreen(flightId: e.flightId),
+                ));
+              }
+            },
+          ),
           if (_events.isNotEmpty) const Divider(height: 1),
           Expanded(
             child: _loading

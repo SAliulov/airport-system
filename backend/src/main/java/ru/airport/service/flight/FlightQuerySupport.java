@@ -1,7 +1,6 @@
 package ru.airport.service.flight;
 
 import ru.airport.model.Flight;
-import ru.airport.model.FlightStatus;
 import ru.airport.model.Schedule;
 
 /**

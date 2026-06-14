@@ -27,6 +27,7 @@ import ru.airport.websocket.RealtimeNotificationService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static ru.airport.service.flight.FlightQuerySupport.touchCollections;
 
@@ -67,7 +68,10 @@ public class FlightCommandService {
         Flight flight = flightGenerationBusinessRules.buildFlight(schedule, slot, rq.getOperationDate());
         flightPlanningTimeBusinessRules.assertScheduledDepartureInFuture(
                 flight.getScheduledDeparture(), airportClock.now());
-        return mapper.toFlightRsSummary(flightRepository.save(flight));
+        Flight saved = flightRepository.save(flight);
+        FlightRs rs = mapper.toFlightRsSummary(saved);
+        realtimeNotificationService.publishFlightCreated(rs);
+        return rs;
     }
 
     @Transactional
@@ -85,11 +89,15 @@ public class FlightCommandService {
             schedules = scheduleRepository.findAllActiveWithSlots();
         }
 
+        // Один bulk-запрос вместо N+1 — формат ключа: slotId|operationDate
+        Set<String> existingKeys = flightRepository.findSlotDateKeysInRange(
+                rq.getFromDate(), rq.getToDate());
+
         FlightGenerationBusinessRules.GenerationPlan plan = flightGenerationBusinessRules.planGeneration(
                 rq.getFromDate(),
                 rq.getToDate(),
                 schedules,
-                flightRepository::existsBySlot_SlotIdAndOperationDate);
+                (slotId, date) -> existingKeys.contains(slotId + "|" + date));
 
         List<Integer> flightIds = new ArrayList<>();
         int pastSkipped = 0;
@@ -125,14 +133,22 @@ public class FlightCommandService {
         Flight flight = flightQueryService.loadFlight(id);
         flightMutationBusinessRules.assertFlightDeletable(flight.getStatus());
         touchCollections(flight);
+        int flightId = flight.getFlightId();
         flightRepository.delete(flight);
+        realtimeNotificationService.publishFlightDeleted(flightId);
     }
 
     @Transactional
     public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId) {
+        // 1. Проверяем, что шаблон расписания вообще существует
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", scheduleId));
+                
+        // 2. Загружаем рейсы ТОЛЬКО для проверки статусов (1 быстрый SELECT)
+        // Коллекции gateAssignments и delayWarnings остаются LAZY и НЕ ТРОГАЮТСЯ
         List<Flight> flights = flightRepository.findBySchedule_ScheduleId(schedule.getScheduleId());
+        
+        // 3. Бизнес-проверка в памяти (работает мгновенно)
         List<Flight> blocked = flights.stream()
                 .filter(f -> {
                     try {
@@ -143,6 +159,7 @@ public class FlightCommandService {
                     }
                 })
                 .toList();
+                
         if (!blocked.isEmpty()) {
             String details = blocked.stream()
                     .map(f -> "#%d %s".formatted(f.getFlightId(), f.getStatus()))
@@ -152,13 +169,19 @@ public class FlightCommandService {
             throw new ru.airport.exception.ConflictException(
                     "Нельзя удалить все рейсы шаблона: есть рейсы не в статусах SCHEDULED/CANCELLED (" + details + ")");
         }
-        for (Flight flight : flights) {
-            touchCollections(flight);
+        
+// 4. Если проверка прошла — бахаем ОДНИМ запросом (1 SQL DELETE)
+        // База данных сама каскадно удалит гейты и задержки по внешнему ключу!
+        List<Integer> flightIds = flights.stream().map(Flight::getFlightId).toList();
+        int deletedCount = flightRepository.deleteByScheduleIdBulk(schedule.getScheduleId());
+
+        for (Integer fid : flightIds) {
+            realtimeNotificationService.publishFlightDeleted(fid);
         }
-        flightRepository.deleteAll(flights);
+
         return FlightBulkDeleteRs.builder()
                 .scheduleId(schedule.getScheduleId())
-                .deleted(flights.size())
+                .deleted(deletedCount)
                 .build();
     }
 }

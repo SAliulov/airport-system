@@ -78,6 +78,7 @@ export function FlightEditModal({
   const gateFromFallback = toDatetimeLocalValue(editDetail.scheduledDeparture);
   const gateToFallback = toDatetimeLocalValue(editDetail.scheduledArrival);
   const showDelayFields = statusNew === 'DELAYED' || (editDetail.status === 'DELAYED' && !statusNew);
+  const showActualFields = editDetail.status === 'SCHEDULED' || editDetail.status === 'DELAYED';
 
   return (
     <div
@@ -147,35 +148,59 @@ export function FlightEditModal({
                   ))}
                 </select>
                 <p className="modal-hint modal-hint--tight">
-                  Вылет/прилёт в {homeIata} — вручную; задержка outbound и автопереходы — планировщик (раз в ~1 мин).
+                  Outbound: введите фактическое время вылета — планировщик переведёт в DEPARTED. Inbound: назначьте тип ВС — планировщик выполнит автовылет.
                 </p>
                 {flightDirection(editDetail.schedule) === 'inbound' && !editDetail.aircraftType && (
                   <p className="modal-hint modal-hint--warning">
-                    Без типа ВС планировщик переведёт рейс в DELAYED после планового вылета + 5 мин;
-                    автовылет (DEPARTED) — только после назначения типа ВС.
+                    Без типа ВС планировщик выполнит автовылет (DEPARTED) после планового вылета при назначении ВС.
                   </p>
                 )}
-                {statusNew === 'DEPARTED' && (
-                  <label className="actual-time-field field-block">
-                    Фактическое время вылета (MSK)
-                    <input
-                      type="datetime-local"
-                      value={statusActualDeparture}
-                      onChange={e => onStatusActualDepartureChange(e.target.value)}
-                    />
-                    <span className="modal-hint modal-hint--tight">{timezone} — не зависит от часового пояса браузера</span>
-                  </label>
-                )}
-                {statusNew === 'ARRIVED' && (
-                  <label className="actual-time-field field-block">
-                    Фактическое время прилёта (MSK)
-                    <input
-                      type="datetime-local"
-                      value={statusActualArrival}
-                      onChange={e => onStatusActualArrivalChange(e.target.value)}
-                    />
-                    <span className="modal-hint modal-hint--tight">{timezone} — не зависит от часового пояса браузера</span>
-                  </label>
+                {showActualFields ? (
+                  <>
+                    <label className="actual-time-field field-block">
+                      Фактическое время вылета (MSK)
+                      <input
+                        type="datetime-local"
+                        value={statusActualDeparture}
+                        onChange={e => onStatusActualDepartureChange(e.target.value)}
+                      />
+                      <span className="modal-hint modal-hint--tight">{timezone} — для outbound: планировщик переведёт в DEPARTED при наступлении этого времени (если заданы гейт и тип ВС)</span>
+                    </label>
+                    <label className="actual-time-field field-block">
+                      Фактическое время прилёта (MSK)
+                      <input
+                        type="datetime-local"
+                        value={statusActualArrival}
+                        onChange={e => onStatusActualArrivalChange(e.target.value)}
+                      />
+                      <span className="modal-hint modal-hint--tight">{timezone} — для inbound: после ввода переведёт рейс в ARRIVED (требуется гейт)</span>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    {statusNew === 'DEPARTED' && (
+                      <label className="actual-time-field field-block">
+                        Фактическое время вылета (MSK)
+                        <input
+                          type="datetime-local"
+                          value={statusActualDeparture}
+                          onChange={e => onStatusActualDepartureChange(e.target.value)}
+                        />
+                        <span className="modal-hint modal-hint--tight">{timezone} — не зависит от часового пояса браузера</span>
+                      </label>
+                    )}
+                    {statusNew === 'ARRIVED' && (
+                      <label className="actual-time-field field-block">
+                        Фактическое время прилёта (MSK)
+                        <input
+                          type="datetime-local"
+                          value={statusActualArrival}
+                          onChange={e => onStatusActualArrivalChange(e.target.value)}
+                        />
+                        <span className="modal-hint modal-hint--tight">{timezone} — не зависит от часового пояса браузера</span>
+                      </label>
+                    )}
+                  </>
                 )}
                 <p className="panel-section__status-line">
                   Текущий:{' '}

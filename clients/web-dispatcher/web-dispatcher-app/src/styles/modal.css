@@ -184,7 +184,7 @@ select.field-invalid {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  min-width: 140px;
 }
 
 .modal-card select {

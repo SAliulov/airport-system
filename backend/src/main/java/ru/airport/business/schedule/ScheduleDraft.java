@@ -5,7 +5,7 @@ import ru.airport.model.PeriodicityType;
 import java.time.LocalDate;
 
 /**
- * Доменное представление шаблона расписания для business-правил (без DTO/Jackson).
+ * Доменное представление шаблона расписания для business-правил (без DTO).
  */
 public record ScheduleDraft(
         String flightNumber,

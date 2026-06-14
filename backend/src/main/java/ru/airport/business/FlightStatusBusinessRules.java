@@ -40,7 +40,7 @@ public class FlightStatusBusinessRules {
     }
 
     public void assertAutoDelay(FlightStatus from) {
-        if (from != FlightStatus.SCHEDULED) {
+        if (from != FlightStatus.SCHEDULED && from != FlightStatus.DEPARTED) {
             throw new ConflictException("Автозадержка недопустима при статусе " + from);
         }
     }

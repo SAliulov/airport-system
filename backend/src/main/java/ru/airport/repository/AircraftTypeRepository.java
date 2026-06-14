@@ -2,9 +2,7 @@ package ru.airport.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import ru.airport.model.AircraftType;
-import ru.airport.model.SizeCategory;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,6 +14,4 @@ public interface AircraftTypeRepository extends JpaRepository<AircraftType, Inte
     Optional<AircraftType> findByIcaoCode(String icaoCode);
 
     boolean existsByIcaoCode(String icaoCode);
-
-    List<AircraftType> findBySizeCategory(SizeCategory sizeCategory);
 }

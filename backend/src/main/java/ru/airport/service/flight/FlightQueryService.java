@@ -37,7 +37,6 @@ import static ru.airport.service.flight.FlightQuerySupport.normalizeSearchQuery;
 import static ru.airport.service.flight.FlightQuerySupport.resolvePageIndex;
 import static ru.airport.service.flight.FlightQuerySupport.resolvePageSize;
 import static ru.airport.service.flight.FlightQuerySupport.touchCollections;
-import static ru.airport.service.flight.FlightQuerySupport.trimUpper;
 
 /**
  * Чтение рейсов: списки, фильтры, поиск, справочники для формы редактирования.
@@ -174,16 +173,11 @@ public class FlightQueryService {
 
         var spec = FlightSpecifications.forApiList(
                 dayStart, dayEnd, status, airlineId, normalizedQuery,
-                normalizedTerminal, hourWindowStart, hourWindowEnd);
+                normalizedTerminal, hourWindowStart, hourWindowEnd,
+                originIata, destinationIata);
 
         Page<Flight> flightPage = flightRepository.findAll(spec, pageable);
         Stream<Flight> stream = flightPage.getContent().stream();
-        if (originIata != null) {
-            stream = stream.filter(f -> originIata.equals(trimUpper(f.getSchedule().getOriginAirport())));
-        }
-        if (destinationIata != null) {
-            stream = stream.filter(f -> destinationIata.equals(trimUpper(f.getSchedule().getDestinationAirport())));
-        }
         if (dir != null && originIata == null && destinationIata == null) {
             stream = stream.filter(f -> matchesAirportDirection(f, dir));
         }

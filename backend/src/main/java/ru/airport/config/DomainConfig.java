@@ -34,7 +34,7 @@ public class DomainConfig {
 
     @Bean
     public FlightActualTimeRules flightActualTimeRules(AirportProperties airportProperties) {
-        return new FlightActualTimeRules(airportProperties.getScheduler().getMaxActualTimeFutureSkewMinutes());
+        return new FlightActualTimeRules(airportProperties);
     }
 
     @Bean

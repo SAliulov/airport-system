@@ -7,7 +7,7 @@ import ru.airport.model.Schedule;
 import java.time.LocalDateTime;
 
 /**
- * Правила домашнего аэропорта (АОС): направление рейса и инварианты перехода в DEPARTED/ARRIVED.
+ * Правила домашнего аэропорта: направление рейса и инварианты перехода в DEPARTED/ARRIVED.
  */
 public class FlightHomeAirportRules {
 
@@ -37,7 +37,6 @@ public class FlightHomeAirportRules {
     }
 
     public void assertManualTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
-        touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.DEPARTURE) {
             throw new BadRequestException(
@@ -58,7 +57,6 @@ public class FlightHomeAirportRules {
 
     /** Прилёт в базовый аэропорт (origin → SVO). */
     public void assertManualTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
-        touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind != OperationKind.ARRIVAL) {
             throw new BadRequestException(
@@ -79,17 +77,28 @@ public class FlightHomeAirportRules {
     }
 
     public void assertAutoTransitionToDeparted(Flight flight, String homeIata, LocalDateTime actualDeparture) {
-        touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
-        if (kind == OperationKind.DEPARTURE) {
-            throw new BadRequestException("Автовылет недоступен для рейсов на вылет из базового аэропорта");
+        if (kind == OperationKind.ARRIVAL) {
+            assertAircraftTypeAssigned(flight);
+            assertActualDeparturePresent(actualDeparture);
+        } else {
+            throw new BadRequestException("Автовылет для outbound рейса выполняется по фактическому времени через планировщик");
         }
-        assertAircraftTypeAssigned(flight);
-        assertActualDeparturePresent(actualDeparture);
+    }
+
+    /**
+     * Outbound auto-departure: диспетчер заполнил actualDeparture + тип ВС + гейт,
+     * планировщик проверяет комплектность и переводит в DEPARTED.
+     */
+    public void assertOutboundAutoDeparture(Flight flight, String homeIata, LocalDateTime actualDeparture) {
+        OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
+        if (kind != OperationKind.DEPARTURE) {
+            throw new BadRequestException("Outbound-автовылет допустим только для рейсов на вылет из базового аэропорта");
+        }
+        assertHomeDepartureRequirements(flight, actualDeparture);
     }
 
     public void assertAutoTransitionToArrived(Flight flight, String homeIata, LocalDateTime actualArrival) {
-        touchGateAssignments(flight);
         OperationKind kind = resolveOperationKind(flight.getSchedule(), homeIata);
         if (kind == OperationKind.ARRIVAL) {
             assertHomeArrivalRequirements(flight, actualArrival);
@@ -135,12 +144,6 @@ public class FlightHomeAirportRules {
         if (actualArrival == null) {
             throw new BadRequestException(
                     "Для перевода в статус ARRIVED необходимо фактическое время прилёта (actualArrival)");
-        }
-    }
-
-    private void touchGateAssignments(Flight flight) {
-        if (flight.getGateAssignments() != null) {
-            flight.getGateAssignments().size();
         }
     }
 

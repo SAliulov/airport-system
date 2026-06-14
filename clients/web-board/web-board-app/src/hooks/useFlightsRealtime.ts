@@ -15,17 +15,32 @@ export function useFlightsRealtime({ setFlights, highlight }: FlightsRealtimeOpt
       try {
         const msg = JSON.parse(body) as Record<string, unknown>;
         if (topic === '/topic/flights') {
-          const flight = msg as unknown as FlightStatusPush & FlightRs;
-          if (!flight.flightId) return;
-          highlight(flight.flightId);
+          const eventType = (msg._eventType as string | undefined) ?? 'UPDATED';
+          const fid = Number(msg.flightId);
+          if (!fid) return;
+
+          if (eventType === 'DELETED') {
+            setFlights(prev => prev.filter(f => f.flightId !== fid));
+            return;
+          }
+
+          if (eventType === 'CREATED') {
+            setFlights(prev => {
+              if (prev.some(f => f.flightId === fid)) return prev;
+              return [...prev, msg as unknown as FlightRs];
+            });
+            return;
+          }
+
+          highlight(fid);
           setFlights(prev =>
             prev.map(f =>
-              f.flightId === flight.flightId
+              f.flightId === fid
                 ? {
                     ...f,
-                    status: flight.status ?? f.status,
-                    actualDeparture: flight.actualDeparture ?? f.actualDeparture,
-                    actualArrival: flight.actualArrival ?? f.actualArrival,
+                    status: (msg.status as string | undefined) ?? f.status,
+                    actualDeparture: (msg.actualDeparture as string | undefined) ?? f.actualDeparture,
+                    actualArrival: (msg.actualArrival as string | undefined) ?? f.actualArrival,
                   }
                 : f,
             ),

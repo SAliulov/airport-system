@@ -101,8 +101,20 @@ public class FlightResourceService {
         gateAssignmentBusinessRules.assertIntervalOverlapsScheduledWindow(
                 rq.getAssignedFrom(), rq.getAssignedTo(), scheduledAnchor);
 
-        gateAssignmentBusinessRules.closePriorAssignmentsForFlight(
+        // Закрываем предыдущие назначения рейса (чистое правило → мутация в сервисе)
+        LocalDateTime closingTime = gateAssignmentBusinessRules.computeClosingTime(
                 flight.getGateAssignments(), rq.getAssignedFrom());
+        if (closingTime != null && flight.getGateAssignments() != null) {
+            for (GateAssignment ga : flight.getGateAssignments()) {
+                if (ga.getAssignedTo() == null || !ga.getAssignedTo().isAfter(closingTime)) {
+                    continue;
+                }
+                ga.setAssignedTo(closingTime);
+                if (!ga.getAssignedFrom().isBefore(ga.getAssignedTo())) {
+                    ga.setAssignedTo(ga.getAssignedFrom().plusMinutes(1));
+                }
+            }
+        }
 
         List<GateAssignment> overlaps = gateAssignmentRepository.findOverlappingForOtherFlights(
                 gate.getGateId(),

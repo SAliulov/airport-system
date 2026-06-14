@@ -485,7 +485,7 @@ class AirportUseCasesIT extends AbstractAirportIT {
         assertThat(reloaded.getActualDeparture()).isNull();
         var warnings = delayWarningRepository.findByFlight_FlightIdOrderByCreatedAtDesc(flight.getFlightId());
         assertThat(warnings).hasSize(1);
-        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_INBOUND_MISSED_DEPARTURE_REASON);
+        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_INBOUND_DEPARTURE_REASON);
     }
 
     @Test
@@ -529,7 +529,7 @@ class AirportUseCasesIT extends AbstractAirportIT {
         assertThat(reloaded.getStatus()).isEqualTo(FlightStatus.DELAYED);
         var warnings = delayWarningRepository.findByFlight_FlightIdOrderByCreatedAtDesc(flight.getFlightId());
         assertThat(warnings).hasSize(1);
-        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_INBOUND_GATE_DELAY_REASON);
+        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_INBOUND_ARRIVAL_DELAY_REASON);
     }
 
     @Test
@@ -548,7 +548,7 @@ class AirportUseCasesIT extends AbstractAirportIT {
         var warnings = delayWarningRepository.findByFlight_FlightIdOrderByCreatedAtDesc(flight.getFlightId());
         assertThat(warnings).hasSize(1);
         assertThat(warnings.getFirst().getDelayMinutes()).isGreaterThanOrEqualTo(5);
-        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_DELAY_REASON);
+        assertThat(warnings.getFirst().getReason()).isEqualTo(FlightAutoStatusService.AUTO_OUTBOUND_DELAY_REASON);
 
         flightStatusScheduler.updateFlightStatuses();
 

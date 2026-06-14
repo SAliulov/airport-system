@@ -108,33 +108,27 @@ public class GateAssignmentBusinessRules {
     }
 
     /**
-     * Закрывает «хвост» предыдущих назначений рейса перед новым интервалом (смена гейта или времени).
+     * Вычисляет время закрытия предыдущих назначений рейса (чистое правило, без мутации).
      */
-    public void closePriorAssignmentsForFlight(List<GateAssignment> assignments, LocalDateTime newFrom) {
+    public LocalDateTime computeClosingTime(List<GateAssignment> assignments, LocalDateTime newFrom) {
         if (assignments == null || newFrom == null) {
-            return;
+            return null;
         }
-        for (GateAssignment ga : assignments) {
-            if (ga.getAssignedTo() == null || !ga.getAssignedTo().isAfter(newFrom)) {
-                continue;
-            }
-            ga.setAssignedTo(newFrom);
-            if (!ga.getAssignedFrom().isBefore(ga.getAssignedTo())) {
-                ga.setAssignedTo(ga.getAssignedFrom().plusMinutes(1));
-            }
-        }
+        return newFrom;
     }
 
-    /** Освобождает гейт при отмене / завершении: обрезает активное назначение до {@code endAt}. */
-    public void closeActiveAssignmentAt(GateAssignment assignment, LocalDateTime endAt) {
+    /** Освобождает гейт при отмене / завершении: возвращает время закрытия (чистое правило, без мутации). */
+    public LocalDateTime computeActiveAssignmentClosingTime(GateAssignment assignment, LocalDateTime endAt) {
         if (assignment == null || endAt == null) {
-            return;
+            return null;
         }
         if (assignment.getAssignedTo() != null && assignment.getAssignedTo().isAfter(endAt)) {
-            assignment.setAssignedTo(endAt);
-            if (!assignment.getAssignedFrom().isBefore(assignment.getAssignedTo())) {
-                assignment.setAssignedTo(assignment.getAssignedFrom().plusMinutes(1));
+            LocalDateTime closing = endAt;
+            if (!assignment.getAssignedFrom().isBefore(closing)) {
+                closing = assignment.getAssignedFrom().plusMinutes(1);
             }
+            return closing;
         }
+        return null;
     }
 }

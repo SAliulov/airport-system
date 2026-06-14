@@ -60,10 +60,6 @@ public class FlightMutationBusinessRules {
         }
     }
 
-    public void assertScheduleMutable(FlightStatus status) {
-        assertResourcesMutable(status);
-    }
-
     /**
      * Удаление разрешено только для SCHEDULED и CANCELLED.
      */
@@ -81,14 +77,6 @@ public class FlightMutationBusinessRules {
         if (flightExists) {
             throw new ConflictException("Рейс на эту дату по выбранному слоту уже существует");
         }
-    }
-
-    /**
-     * @deprecated используйте {@link #assertNoExistingFlightForSlot(boolean)}
-     */
-    @Deprecated
-    public void assertNoExistingFlightForSchedule(boolean flightExists) {
-        assertNoExistingFlightForSlot(flightExists);
     }
 
     /**

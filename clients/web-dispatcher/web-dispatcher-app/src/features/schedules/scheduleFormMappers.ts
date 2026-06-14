@@ -1,4 +1,4 @@
-import type { PeriodicityType, ScheduleRs } from '../../types';
+import type { ScheduleRs } from '../../types';
 import type { ScheduleRq } from '../../types/requests';
 import { fromTimeInputValue, todayAirportDate, toTimeInputValue } from '../../utils/airportTime';
 import type { ScheduleFormValues, ScheduleSlotFormValues } from '../../utils/fieldValidation';
@@ -66,17 +66,4 @@ export function buildSchedulePayload(form: ScheduleFormValues): ScheduleRq {
       arrivalTime: fromTimeInputValue(slot.arrivalTime) ?? slot.arrivalTime,
     })),
   };
-}
-
-/** Краткая подпись слота для таблицы. */
-export function formatSlotSummary(
-  slot: { dayOfWeek?: number; departureTime: string; arrivalTime: string },
-  periodicityType?: PeriodicityType,
-  isoDayOfWeekLabelFn?: (dow?: number) => string,
-): string {
-  const dow =
-    periodicityType === 'INTERVAL' || !isoDayOfWeekLabelFn
-      ? ''
-      : `${isoDayOfWeekLabelFn(slot.dayOfWeek)} `;
-  return `${dow}${slot.departureTime}–${slot.arrivalTime}`;
 }

@@ -130,5 +130,3 @@ export function FilterBar({ filters, airlines, terminals, homeIata, onChange }: 
     </div>
   );
 }
-
-export type { DayPreset } from '../constants/boardFilters';

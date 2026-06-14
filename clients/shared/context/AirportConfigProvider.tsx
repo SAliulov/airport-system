@@ -134,11 +134,3 @@ export function useAirportConfig(): AirportConfigRs {
   }
   return ctx.config;
 }
-
-export function useAirportConfigActions() {
-  const ctx = useContext(AirportConfigContext);
-  if (!ctx) {
-    throw new Error('useAirportConfigActions must be used within AirportConfigProvider');
-  }
-  return { retry: ctx.retry };
-}

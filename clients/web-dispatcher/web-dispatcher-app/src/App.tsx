@@ -10,6 +10,7 @@ import AirlinesPage from './pages/AirlinesPage';
 import AircraftTypesPage from './pages/AircraftTypesPage';
 import GatesPage from './pages/GatesPage';
 import TimelinePage from './pages/TimelinePage';
+import FaqPage from './pages/FaqPage';
 
 const DISPATCHER_ROLE = 'DISPATCHER';
 
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="aircraft-types" element={<AircraftTypesPage />} />
         <Route path="gates" element={<GatesPage />} />
         <Route path="timeline" element={<TimelinePage />} />
+        <Route path="faq" element={<FaqPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

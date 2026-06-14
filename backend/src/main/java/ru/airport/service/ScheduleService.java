@@ -142,7 +142,7 @@ public class ScheduleService {
             LocalDateTime end = airportClock.startOfNextDay(date);
             if (status != null) {
                 List<Flight> flights = flightRepository.findAll(
-                        FlightSpecifications.forApiList(start, end, status, null, null, null, null, null));
+                        FlightSpecifications.forApiList(start, end, status, null, null, null, null, null, null, null));
                 return distinctSchedules(flights.stream().map(Flight::getSchedule).toList());
             }
             return scheduleRepository.findAllActiveWithSlots().stream()
@@ -218,14 +218,23 @@ public class ScheduleService {
                     "Нельзя удалить расписание %s: связано рейсов — %d (%s)"
                             .formatted(schedule.getFlightNumber(), linked.size(), details));
         }
-        scheduleBusinessRules.assertMayDelete(false);
+        scheduleBusinessRules.assertMayDelete(!linked.isEmpty());
         scheduleRepository.deleteById(id);
     }
 
     private void publishLinkedFlights(List<Flight> linkedFlights) {
+        if (linkedFlights.isEmpty()) return;
+
+        Map<Integer, Flight> freshById = flightRepository.findAllById(
+                linkedFlights.stream().map(Flight::getFlightId).toList())
+                .stream()
+                .collect(Collectors.toMap(Flight::getFlightId, f -> f));
+
         for (Flight linked : linkedFlights) {
-            Flight fresh = flightRepository.findById(linked.getFlightId()).orElseThrow();
-            realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(fresh));
+            Flight fresh = freshById.get(linked.getFlightId());
+            if (fresh != null) {
+                realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(fresh));
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Русские подписи и цвета статусов рейса (MD3 colorScheme).
+/// Русские подписи, цвета и иконки статусов рейса (высококонтрастные MD3).
 class FlightStatusUi {
   FlightStatusUi._();
 
@@ -21,18 +21,35 @@ class FlightStatusUi {
     }
   }
 
+  static IconData iconFor(String status) {
+    switch (status) {
+      case 'SCHEDULED':
+        return Icons.schedule;
+      case 'DEPARTED':
+        return Icons.flight_takeoff;
+      case 'ARRIVED':
+        return Icons.flight_land;
+      case 'DELAYED':
+        return Icons.warning_rounded;
+      case 'CANCELLED':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
   static Color colorFor(ColorScheme scheme, String status) {
     switch (status) {
       case 'SCHEDULED':
-        return scheme.primary;
+        return const Color(0xFF1565C0);
       case 'DEPARTED':
-        return scheme.tertiary;
+        return const Color(0xFF2E7D32);
       case 'ARRIVED':
-        return scheme.secondary;
+        return const Color(0xFF1B5E20);
       case 'DELAYED':
-        return scheme.error;
+        return const Color(0xFFE65100);
       case 'CANCELLED':
-        return scheme.outline;
+        return const Color(0xFFC62828);
       default:
         return scheme.onSurface;
     }

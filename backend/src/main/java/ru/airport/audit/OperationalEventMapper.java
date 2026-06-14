@@ -55,9 +55,4 @@ public class OperationalEventMapper {
         }
         return Optional.empty();
     }
-
-    /** Для unit-тестов. */
-    static String statusLabel(ru.airport.model.FlightStatus status) {
-        return OperationalEventSupport.statusLabel(status);
-    }
 }

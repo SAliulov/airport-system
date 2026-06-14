@@ -12,7 +12,6 @@ export default function AirlinesPage() {
   const [items, setItems] = useState<AirlineRs[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
-  const [filter, setFilter] = useState('');
   const [pageError, setPageError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -71,28 +70,10 @@ export default function AirlinesPage() {
     setFieldErrors({});
   }
 
-  const visibleItems = items.filter(a => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return true;
-    return [a.iataCode, a.name, a.country ?? ''].some(value => value.toLowerCase().includes(q));
-  });
-
   return (
     <div className="page">
       <h1>Авиакомпании</h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
-      <div className="form-row form-row--toolbar directory-filter-row">
-        <input
-          placeholder="Фильтр по IATA, названию или стране"
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-        />
-        {filter && (
-          <button type="button" className="btn-ghost btn-sm" onClick={() => setFilter('')}>
-            Сбросить
-          </button>
-        )}
-      </div>
       <div className="form-row directory-form-row">
         <div className="inline-field">
           <input
@@ -136,7 +117,7 @@ export default function AirlinesPage() {
       <table className="data-table">
         <thead><tr><th>IATA</th><th>Название</th><th>Страна</th><th></th></tr></thead>
         <tbody>
-          {visibleItems.map(a => (
+          {items.map(a => (
             <tr key={a.airlineId}>
               <td>{a.iataCode}</td><td>{a.name}</td><td>{a.country ?? '—'}</td>
               <td className="cell-actions">

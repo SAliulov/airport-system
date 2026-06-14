@@ -66,10 +66,6 @@ export interface DelayWarningRq {
   reason?: string;
 }
 
-export interface AircraftAssignmentRq {
-  aircraftTypeId: number;
-}
-
 export interface FlightGenerateRq {
   fromDate: string;
   toDate: string;
@@ -79,7 +75,6 @@ export interface FlightGenerateRq {
 export interface FlightGenerateRs {
   created: number;
   skipped: number;
-  flightIds: number[];
 }
 
 export interface FlightBulkDeleteRs {

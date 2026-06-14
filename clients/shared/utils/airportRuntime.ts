@@ -11,7 +11,7 @@ export function clearAirportRuntime(): void {
   runtime = null;
 }
 
-export function getAirportRuntime(): AirportConfigRs {
+function getAirportRuntime(): AirportConfigRs {
   if (!runtime) {
     throw new Error('Airport config not loaded');
   }
@@ -24,12 +24,4 @@ export function getHomeIata(): string {
 
 export function getAirportTimezone(): string {
   return getAirportRuntime().timezone;
-}
-
-export function getGatePlanWindowHours(): number {
-  return getAirportRuntime().gatePlanWindowHours;
-}
-
-export function getGatePostGraceMinutes(): number {
-  return getAirportRuntime().gatePostGraceMinutes;
 }
