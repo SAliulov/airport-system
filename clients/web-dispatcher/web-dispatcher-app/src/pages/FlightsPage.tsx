@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageStatus from '../components/PageStatus';
 import { FlightCreateModal } from '../features/flights/components/FlightCreateModal';
@@ -46,6 +46,8 @@ export default function FlightsPage() {
   const debouncedSearch = useDebouncedValue(searchQuery.trim(), 400);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [exportInfo, setExportInfo] = useState<string | null>(null);
+const [notification, setNotification] = useState<string | null>(null);
+const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     flights,
@@ -82,6 +84,11 @@ export default function FlightsPage() {
     highlight,
     editingDetailRef: edit.editingDetailRef,
     onDetailRefresh: edit.handleDetailRefresh,
+    onOperationalEvent: (message) => {
+      if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+      setNotification(message);
+      notificationTimerRef.current = setTimeout(() => setNotification(null), 5000);
+    },
   });
 
   const modals = useFlightPageModals({
@@ -158,6 +165,20 @@ export default function FlightsPage() {
         </span>
       </h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
+
+      {notification && (
+        <div className="page-notification" role="status">
+          {notification}
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => setNotification(null)}
+            aria-label="Закрыть"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {modals.createSuccess && (
         <div className="page-success-banner" role="status">

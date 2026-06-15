@@ -13,7 +13,7 @@ export async function fetchAirportConfig(apiBase: string): Promise<AirportConfig
   return {
     homeIata: data.homeIata.trim().toUpperCase(),
     timezone: data.timezone,
-    gatePlanWindowHours: data.gatePlanWindowHours ?? 12,
-    gatePostGraceMinutes: data.gatePostGraceMinutes ?? 15,
+    gatePlanWindowHours: data.gatePlanWindowHours,
+    gatePostGraceMinutes: data.gatePostGraceMinutes,
   };
 }

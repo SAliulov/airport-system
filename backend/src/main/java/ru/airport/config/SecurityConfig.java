@@ -1,6 +1,5 @@
 package ru.airport.config;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,14 +27,15 @@ import java.util.List;
  */
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private static final List<String> DEV_ORIGIN_PATTERNS = List.of(
-            "http://localhost:*",
-            "http://127.0.0.1:*"
-    );
+    private final AirportProperties airportProperties;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AirportProperties airportProperties) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.airportProperties = airportProperties;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -79,7 +79,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowCredentials(true);
-        c.setAllowedOriginPatterns(DEV_ORIGIN_PATTERNS);
+        c.setAllowedOriginPatterns(airportProperties.getAllowedOrigins());
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         c.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

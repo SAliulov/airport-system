@@ -118,8 +118,13 @@ public class FlightController {
     }
 
     @DeleteMapping("/by-schedule/{scheduleId}")
-    public FlightBulkDeleteRs deleteBySchedule(@PathVariable("scheduleId") Integer scheduleId) {
-        return flightService.deleteBySchedule(scheduleId);
+    public FlightBulkDeleteRs deleteBySchedule(
+            @PathVariable("scheduleId") Integer scheduleId,
+            @RequestParam(name = "fromDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(name = "toDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return flightService.deleteBySchedule(scheduleId, fromDate, toDate);
     }
 
     @PutMapping("/{id}/status")

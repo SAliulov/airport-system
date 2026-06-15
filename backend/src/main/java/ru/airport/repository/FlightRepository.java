@@ -84,6 +84,10 @@ boolean existsBySlot_SlotId(Integer slotId);
     @Query("DELETE FROM Flight f WHERE f.schedule.scheduleId = :scheduleId")
     int deleteByScheduleIdBulk(@Param("scheduleId") Integer scheduleId);
 
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Flight f WHERE f.flightId IN :flightIds")
+    int deleteByFlightIdsBulk(@Param("flightIds") List<Integer> flightIds);
+
     @Query("""
             SELECT CAST(f.slot.slotId AS string) || '|' || CAST(f.operationDate AS string)
             FROM Flight f

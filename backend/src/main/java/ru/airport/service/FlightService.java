@@ -141,7 +141,7 @@ public class FlightService {
     }
 
     @Transactional
-    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId) {
-        return flightCommandService.deleteBySchedule(scheduleId);
+    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId, LocalDate fromDate, LocalDate toDate) {
+        return flightCommandService.deleteBySchedule(scheduleId, fromDate, toDate);
     }
 }

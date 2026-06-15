@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useStomp } from './useStomp';
-import type { DelayWarningPush, FlightRs, FlightStatusPush, GateAssignmentPush } from '../types';
+import type { DelayWarningPush, FlightRs, FlightStatus, GateAssignmentPush } from '../types';
 import { BOARD_WS_TOPICS } from '../constants/boardFilters';
 
 export interface FlightsRealtimeOptions {
@@ -38,7 +38,7 @@ export function useFlightsRealtime({ setFlights, highlight }: FlightsRealtimeOpt
               f.flightId === fid
                 ? {
                     ...f,
-                    status: (msg.status as string | undefined) ?? f.status,
+                    status: (msg.status as FlightStatus) ?? f.status,
                     actualDeparture: (msg.actualDeparture as string | undefined) ?? f.actualDeparture,
                     actualArrival: (msg.actualArrival as string | undefined) ?? f.actualArrival,
                   }

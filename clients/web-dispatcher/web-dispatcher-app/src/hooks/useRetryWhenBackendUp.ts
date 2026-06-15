@@ -18,8 +18,11 @@ export function useRetryWhenBackendUp(
   const [waiting, setWaiting] = useState(false);
   const onRetryRef = useRef(onRetry);
   const setPageErrorRef = useRef(setPageError);
-  onRetryRef.current = onRetry;
-  setPageErrorRef.current = setPageError;
+
+  useEffect(() => {
+    onRetryRef.current = onRetry;
+    setPageErrorRef.current = setPageError;
+  }, [onRetry, setPageError]);
 
   const isNetwork = isNetworkErrorMessage(pageError);
 

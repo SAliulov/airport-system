@@ -4,6 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Настройки домашнего аэропорта и планировщика ({@code airport.*} в application.yml).
  */
@@ -14,12 +17,14 @@ public class AirportProperties {
 
     private String homeIata = "SVO";
     private String timezone = "Europe/Moscow";
+    private List<String> allowedOrigins = new ArrayList<>();
 
     /** Окно ±N часов вокруг планового вылета/прилёта для интервала гейта. */
     private int gatePlanWindowHours = 12;
 
     /** Минуты после assigned_to, в которые допустим факт вылета/прилёта у гейта. */
     private int gatePostGraceMinutes = 15;
+    private int scheduleGenerationHorizonDays = 365;
 
     private Scheduler scheduler = new Scheduler();
 

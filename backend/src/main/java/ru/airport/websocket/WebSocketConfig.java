@@ -1,22 +1,22 @@
 package ru.airport.websocket;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import ru.airport.config.AirportProperties;
 
 /**
  * STOMP поверх WebSocket: эндпоинт {@code /ws}, брокер с префиксом {@code /topic} (AGENTS §8).
  */
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-    private static final String[] DEV_ORIGIN_PATTERNS = {
-            "http://localhost:*",
-            "http://127.0.0.1:*"
-    };
 
+    private final AirportProperties airportProperties;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -26,10 +26,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        String[] origins = airportProperties.getAllowedOrigins().toArray(new String[0]);
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns(DEV_ORIGIN_PATTERNS)
+                .setAllowedOriginPatterns(origins)
                 .withSockJS();
-        registry.addEndpoint("/ws/raw")
-                .setAllowedOriginPatterns(DEV_ORIGIN_PATTERNS);
+        // Raw WebSocket для мобильных клиентов (Flutter).
+        // Нативные приложения не шлют Origin-заголовок, поэтому origin-проверка отключена.
+        registry.addEndpoint("/ws/raw");
     }
 }

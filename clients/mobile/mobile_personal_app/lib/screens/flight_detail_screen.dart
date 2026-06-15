@@ -47,6 +47,13 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
 
   void _onRealtime(RealtimeEvent e) {
     if (e.flightId != widget.flightId || e.payload == null || !mounted) return;
+
+    // Handle DELETED — navigate back
+    if (e.payload!['_eventType'] == 'DELETED') {
+      Navigator.of(context).maybePop();
+      return;
+    }
+
     setState(() {
       if (e.type == EventType.gateChange) {
         final assignment = e.payload!['assignment'] as Map<String, dynamic>?;

@@ -9,7 +9,7 @@ export const FILTER_STATUSES: FlightStatus[] = [
   'CANCELLED',
 ];
 
-export const FLIGHT_WS_TOPICS = ['/topic/flights', '/topic/delays', '/topic/gate-changes'] as const;
+export const FLIGHT_WS_TOPICS = ['/topic/flights', '/topic/delays', '/topic/gate-changes', '/topic/operational-events'] as const;
 
 export function getFlightsRulesTooltip(): string {
   const home = getHomeIata();

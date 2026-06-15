@@ -14,7 +14,7 @@ class AppConfig {
     final uri = Uri.parse(_apiBase);
     final scheme = uri.scheme == 'https' ? 'wss' : 'ws';
     final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
-    return '$scheme://${uri.host}:$port/ws/websocket';
+    return '$scheme://${uri.host}:$port/ws/raw';
   }
 
   /// Загрузить сохранённый адрес или `--dart-define=API_BASE=...`.

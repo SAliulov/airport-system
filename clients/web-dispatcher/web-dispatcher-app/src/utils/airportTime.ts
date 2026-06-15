@@ -18,7 +18,7 @@ const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 export function toDatetimeLocalValue(apiValue?: string | null): string {
   if (!apiValue) return '';
   const match = apiValue.trim().match(NAIVE_DATE_TIME);
-  if (match) return `${match[1]}T${match[4]}:${match[5]}`;
+  if (match) return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}`;
   return '';
 }
 

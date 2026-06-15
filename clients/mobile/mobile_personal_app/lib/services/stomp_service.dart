@@ -27,8 +27,13 @@ class StompService {
   void addListener(EventCallback cb) => _listeners.add(cb);
   void removeListener(EventCallback cb) => _listeners.remove(cb);
 
-  void addOperationalListener(OperationalEventCallback cb) =>
-      _operationalListeners.add(cb);
+void addOperationalListener(OperationalEventCallback cb) {
+    _operationalListeners.add(cb);
+    if (_connected && _operationalUnsubscribe == null) {
+      _subscribeOperational();
+    }
+  }
+
   void removeOperationalListener(OperationalEventCallback cb) =>
       _operationalListeners.remove(cb);
 

@@ -4,6 +4,16 @@ import SockJS from 'sockjs-client';
 
 type MessageCallback = (body: string, topic: string) => void;
 
+function resolveWsUrl(apiBase: string): string {
+  if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
+    const url = new URL(apiBase);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${url.origin}/ws`;
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${window.location.host}/ws`;
+}
+
 /**
  * Подписка на STOMP-топики через SockJS. Callback стабилен через ref.
  */
@@ -12,8 +22,9 @@ export function useStomp(apiBase: string, topics: string[], onMessage: MessageCa
   cbRef.current = onMessage;
 
   useEffect(() => {
+    const wsUrl = resolveWsUrl(apiBase);
     const client = new Client({
-      webSocketFactory: () => new SockJS(`${apiBase}/ws`) as WebSocket,
+      webSocketFactory: () => new SockJS(wsUrl) as WebSocket,
       reconnectDelay: 5000,
       onConnect: () => {
         topics.forEach(topic => {

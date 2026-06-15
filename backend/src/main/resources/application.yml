@@ -40,8 +40,13 @@ jwt:
 airport:
   home-iata: SVO
   timezone: Europe/Moscow
+  allowed-origins:
+    - "http://localhost:*"
+    - "http://127.0.0.1:*"
+    - "https://45.133.74.67"
   gate-plan-window-hours: 12
   gate-post-grace-minutes: 15
+  schedule-generation-horizon-days: 365
   scheduler:
     flight-status-ms: 60000
     outbound-delay-grace-minutes: 5

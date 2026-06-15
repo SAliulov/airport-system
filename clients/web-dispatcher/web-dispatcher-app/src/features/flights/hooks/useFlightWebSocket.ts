@@ -9,6 +9,7 @@ export interface FlightWebSocketOptions {
   highlight: (flightId: number) => void;
   editingDetailRef: React.MutableRefObject<FlightRs | null>;
   onDetailRefresh: (detail: FlightRs) => void;
+  onOperationalEvent?: (message: string) => void;
 }
 
 /**
@@ -19,25 +20,46 @@ export function useFlightWebSocket({
   highlight,
   editingDetailRef,
   onDetailRefresh,
+  onOperationalEvent,
 }: FlightWebSocketOptions) {
   const handleWsMessage = useCallback(
     (body: string, topic: string) => {
       try {
         const msg = JSON.parse(body) as Record<string, unknown>;
+
+        if (topic === '/topic/operational-events') {
+          const message = (msg.message as string | undefined) ?? '';
+          if (message && onOperationalEvent) {
+            onOperationalEvent(message);
+          }
+          return;
+        }
+
         if (topic === '/topic/flights' && msg.flightId) {
           const fid = Number(msg.flightId);
           const eventType = (msg._eventType as string | undefined) ?? 'UPDATED';
 
           if (eventType === 'DELETED') {
             setFlights(prev => prev.filter(f => f.flightId !== fid));
+            if (onOperationalEvent) {
+              onOperationalEvent(`Рейс #${fid} удалён`);
+            }
             return;
           }
 
           if (eventType === 'CREATED') {
+            const flightNumber = (msg as Record<string, unknown>).schedule
+              ? ((msg as Record<string, unknown>).schedule as Record<string, unknown>)?.flightNumber as string ?? ''
+              : '';
+            const label = flightNumber || `#${fid}`;
+            const status = (msg.status as string | undefined) ?? 'SCHEDULED';
             setFlights(prev => {
               if (prev.some(f => f.flightId === fid)) return prev;
               return [...prev, msg as unknown as FlightRs];
             });
+            if (onOperationalEvent) {
+              onOperationalEvent(`Создан рейс ${label} (#${fid}) — ${status}`);
+            }
             return;
           }
 
@@ -81,7 +103,7 @@ export function useFlightWebSocket({
         // ignore malformed websocket payloads
       }
     },
-    [highlight, onDetailRefresh, setFlights, editingDetailRef],
+    [highlight, onDetailRefresh, setFlights, editingDetailRef, onOperationalEvent],
   );
 
   useStomp([...FLIGHT_WS_TOPICS], handleWsMessage);

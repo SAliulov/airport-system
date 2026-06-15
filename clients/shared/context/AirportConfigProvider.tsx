@@ -37,8 +37,8 @@ function resolveDevFallback(fallback?: DevAirportFallback): AirportConfigRs | nu
   return {
     homeIata: fallback.homeIata.trim().toUpperCase(),
     timezone: fallback.timezone,
-    gatePlanWindowHours: fallback.gatePlanWindowHours ?? 12,
-    gatePostGraceMinutes: fallback.gatePostGraceMinutes ?? 15,
+    gatePlanWindowHours: fallback.gatePlanWindowHours ?? 2,
+    gatePostGraceMinutes: fallback.gatePostGraceMinutes ?? 5,
   };
 }
 

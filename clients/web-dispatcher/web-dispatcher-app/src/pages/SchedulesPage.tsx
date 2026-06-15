@@ -208,7 +208,7 @@ export default function SchedulesPage() {
   }
 
   function handleSubmitError(e: unknown) {
-    const mapped = mapScheduleBackendError(e, form);
+    const mapped = mapScheduleBackendError(e);
     if (mapped) {
       setFieldErrors(mapped.fieldErrors);
       setModalError(mapped.message);

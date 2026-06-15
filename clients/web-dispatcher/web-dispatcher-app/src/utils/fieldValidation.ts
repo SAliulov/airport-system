@@ -79,7 +79,6 @@ function ok(): ValidationResult {
 
 export function mapScheduleBackendError(
   error: unknown,
-  _form: ScheduleFormValues,
 ): { fieldErrors: Record<string, string>; message: string } | null {
   const text = error instanceof Error ? error.message : String(error);
   const match = text.match(SLOT_PERIOD_RE);

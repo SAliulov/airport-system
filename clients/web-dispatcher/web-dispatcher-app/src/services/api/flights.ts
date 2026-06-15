@@ -13,6 +13,7 @@ import type {
   FlightRs,
   GateAssignmentRs,
   PageRs,
+  DelayWarningRs,
 } from '../../types';
 
 export type FlightListParams = {

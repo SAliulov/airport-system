@@ -33,7 +33,7 @@ export function isClosedFlightStatus(status: FlightStatus): boolean {
 /**
  * Определяет направление рейса относительно домашнего аэропорта.
  */
-export function flightDirection(schedule?: ScheduleRs): FlightDirection {
+export function flightDirection(schedule?: ScheduleRs): 'outbound' | 'inbound' | null {
   const home = getHomeIata();
   const o = (schedule?.originAirport ?? '').trim().toUpperCase();
   const d = (schedule?.destinationAirport ?? '').trim().toUpperCase();

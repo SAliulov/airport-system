@@ -41,15 +41,15 @@ class FlightStatusUi {
   static Color colorFor(ColorScheme scheme, String status) {
     switch (status) {
       case 'SCHEDULED':
-        return const Color(0xFF1565C0);
+        return const Color(0xFF1565C0); // blue
       case 'DEPARTED':
-        return const Color(0xFF2E7D32);
+        return const Color(0xFFFF8F00); // amber
       case 'ARRIVED':
-        return const Color(0xFF1B5E20);
+        return const Color(0xFF1B5E20); // dark green
       case 'DELAYED':
-        return const Color(0xFFE65100);
+        return const Color(0xFFD32F2F); // red
       case 'CANCELLED':
-        return const Color(0xFFC62828);
+        return const Color(0xFF757575); // grey
       default:
         return scheme.onSurface;
     }

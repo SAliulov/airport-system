@@ -15,6 +15,7 @@ import ru.airport.dto.FlightGenerateRq;
 import ru.airport.dto.FlightGenerateRs;
 import ru.airport.dto.FlightRq;
 import ru.airport.dto.FlightRs;
+import ru.airport.exception.ConflictException;
 import ru.airport.exception.ResourceNotFoundException;
 import ru.airport.mapper.DtoMapper;
 import ru.airport.model.Flight;
@@ -25,6 +26,7 @@ import ru.airport.repository.ScheduleRepository;
 import ru.airport.repository.ScheduleSlotRepository;
 import ru.airport.websocket.RealtimeNotificationService;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -79,6 +81,15 @@ public class FlightCommandService {
         var now = airportClock.now();
         flightPlanningTimeBusinessRules.assertGenerationStartsTodayOrLater(
                 rq.getFromDate(), now.toLocalDate());
+
+        // Cap generation horizon at configured max days
+        LocalDate maxHorizonDate = now.toLocalDate()
+                .plusDays(airportProperties.getScheduleGenerationHorizonDays());
+        LocalDate toDate = rq.getToDate();
+        if (toDate.isAfter(maxHorizonDate)) {
+            toDate = maxHorizonDate;
+        }
+
         List<Schedule> schedules;
         if (rq.getScheduleId() != null) {
             Schedule schedule = scheduleRepository.findByIdWithSlots(rq.getScheduleId()).stream()
@@ -91,11 +102,11 @@ public class FlightCommandService {
 
         // Один bulk-запрос вместо N+1 — формат ключа: slotId|operationDate
         Set<String> existingKeys = flightRepository.findSlotDateKeysInRange(
-                rq.getFromDate(), rq.getToDate());
+                rq.getFromDate(), toDate);
 
         FlightGenerationBusinessRules.GenerationPlan plan = flightGenerationBusinessRules.planGeneration(
                 rq.getFromDate(),
-                rq.getToDate(),
+                toDate,
                 schedules,
                 (slotId, date) -> existingKeys.contains(slotId + "|" + date));
 
@@ -109,7 +120,7 @@ public class FlightCommandService {
             flightHomeAirportRules.assertValidHomeRoute(draft.getSchedule(), homeIata());
             Flight saved = flightRepository.save(draft);
             flightIds.add(saved.getFlightId());
-            realtimeNotificationService.publishFlightUpdate(mapper.toFlightRsSummary(saved));
+            realtimeNotificationService.publishFlightCreated(mapper.toFlightRsSummary(saved));
         }
 
         return FlightGenerateRs.builder()
@@ -138,18 +149,24 @@ public class FlightCommandService {
         realtimeNotificationService.publishFlightDeleted(flightId);
     }
 
-    @Transactional
-    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId) {
-        // 1. Проверяем, что шаблон расписания вообще существует
+@Transactional
+    public FlightBulkDeleteRs deleteBySchedule(Integer scheduleId, LocalDate fromDate, LocalDate toDate) {
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", scheduleId));
-                
-        // 2. Загружаем рейсы ТОЛЬКО для проверки статусов (1 быстрый SELECT)
-        // Коллекции gateAssignments и delayWarnings остаются LAZY и НЕ ТРОГАЮТСЯ
+
         List<Flight> flights = flightRepository.findBySchedule_ScheduleId(schedule.getScheduleId());
-        
-        // 3. Бизнес-проверка в памяти (работает мгновенно)
-        List<Flight> blocked = flights.stream()
+
+        // Filter by date range if specified
+        List<Flight> targetFlights = flights.stream()
+                .filter(f -> {
+                    if (fromDate != null && f.getOperationDate().isBefore(fromDate)) return false;
+                    if (toDate != null && f.getOperationDate().isAfter(toDate)) return false;
+                    return true;
+                })
+                .toList();
+
+        // Only check status of flights WITHIN the requested range
+        List<Flight> blocked = targetFlights.stream()
                 .filter(f -> {
                     try {
                         flightMutationBusinessRules.assertFlightDeletable(f.getStatus());
@@ -159,21 +176,22 @@ public class FlightCommandService {
                     }
                 })
                 .toList();
-                
+
         if (!blocked.isEmpty()) {
             String details = blocked.stream()
                     .map(f -> "#%d %s".formatted(f.getFlightId(), f.getStatus()))
                     .limit(10)
                     .reduce((a, b) -> a + "; " + b)
                     .orElse("");
-            throw new ru.airport.exception.ConflictException(
-                    "Нельзя удалить все рейсы шаблона: есть рейсы не в статусах SCHEDULED/CANCELLED (" + details + ")");
+            throw new ConflictException(
+                    "Нельзя удалить рейсы: есть рейсы не в статусах SCHEDULED/CANCELLED (" + details + ")");
         }
-        
-// 4. Если проверка прошла — бахаем ОДНИМ запросом (1 SQL DELETE)
-        // База данных сама каскадно удалит гейты и задержки по внешнему ключу!
-        List<Integer> flightIds = flights.stream().map(Flight::getFlightId).toList();
-        int deletedCount = flightRepository.deleteByScheduleIdBulk(schedule.getScheduleId());
+
+        List<Integer> flightIds = targetFlights.stream().map(Flight::getFlightId).toList();
+        int deletedCount = 0;
+        if (!flightIds.isEmpty()) {
+            deletedCount = flightRepository.deleteByFlightIdsBulk(flightIds);
+        }
 
         for (Integer fid : flightIds) {
             realtimeNotificationService.publishFlightDeleted(fid);

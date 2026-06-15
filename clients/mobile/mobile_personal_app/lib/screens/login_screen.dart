@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _serverCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Адрес сервера',
-                    hintText: 'http://192.168.0.25:8080',
+                    hintText: 'https://45.133.74.67',
                     prefixIcon: Icon(Icons.dns),
                   ),
                   keyboardType: TextInputType.url,
