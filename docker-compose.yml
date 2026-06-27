@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
+      SERVER_ADDRESS: 127.0.0.1
       SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:5432/airport
       SPRING_DATASOURCE_USERNAME: airport_user
       SPRING_DATASOURCE_PASSWORD: airport_pass
@@ -24,3 +25,5 @@ services:
       - backend
     volumes:
       - /var/www/acme-challenge:/var/www/acme-challenge:ro
+      - /root/.acme.sh/45.133.74.67_ecc/fullchain.cer:/etc/nginx/ssl/fullchain.cer:ro
+      - /root/.acme.sh/45.133.74.67_ecc/45.133.74.67.key:/etc/nginx/ssl/45.133.74.67.key:ro
