@@ -50,6 +50,7 @@ export function useFlightPageModals({
   const [generateSaving, setGenerateSaving] = useState(false);
   const [bulkDeleteSaving, setBulkDeleteSaving] = useState(false);
   const [generateInfo, setGenerateInfo] = useState<string | null>(null);
+  const [bulkDeleteConfirmLabel, setBulkDeleteConfirmLabel] = useState<string | null>(null);
 
   const availableSlots = useMemo(() => {
     const opts: { slotId: number; schedule: ScheduleRs; slot: ScheduleSlotRs }[] = [];
@@ -144,7 +145,7 @@ export function useFlightPageModals({
     }
   }
 
-  async function submitBulkDeleteBySchedule() {
+  function requestBulkDeleteBySchedule() {
     if (!generateScheduleId) {
       setGenerateInfo('Выберите шаблон, по которому нужно удалить сгенерированные рейсы.');
       return;
@@ -153,9 +154,15 @@ export function useFlightPageModals({
     const label = schedule
       ? `${schedule.flightNumber} ${schedule.originAirport.trim()}→${schedule.destinationAirport.trim()}`
       : `#${generateScheduleId}`;
-    if (!confirm(`Удалить все рейсы шаблона ${label}? Уже вылетевшие/прибывшие рейсы сервер не удалит.`)) {
-      return;
-    }
+    setBulkDeleteConfirmLabel(label);
+  }
+
+  function cancelBulkDeleteConfirm() {
+    setBulkDeleteConfirmLabel(null);
+  }
+
+  async function confirmBulkDeleteBySchedule() {
+    if (!generateScheduleId) return;
     setBulkDeleteSaving(true);
     setGenerateInfo(null);
     try {
@@ -164,6 +171,7 @@ export function useFlightPageModals({
       setFilterDate('');
       setSchedules(await getSchedules());
       load('');
+      setBulkDeleteConfirmLabel(null);
     } catch (e: unknown) {
       setGenerateInfo(formatApiError(e));
     } finally {
@@ -234,6 +242,9 @@ export function useFlightPageModals({
     generateInfo,
     openGenerateModal,
     submitGenerate,
-    submitBulkDeleteBySchedule,
+    bulkDeleteConfirmLabel,
+    requestBulkDeleteBySchedule,
+    cancelBulkDeleteConfirm,
+    confirmBulkDeleteBySchedule,
   };
 }

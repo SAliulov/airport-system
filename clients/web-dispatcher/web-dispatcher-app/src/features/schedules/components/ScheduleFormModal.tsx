@@ -1,6 +1,7 @@
 import { useAirportConfig } from '../../../../../../shared/context/AirportConfigProvider';
 import type { AirlineRs, PeriodicityType } from '../../../types';
 import type { ScheduleFormValues, ScheduleSlotFormValues } from '../../../utils/fieldValidation';
+import { Modal } from '../../../shared/components/Modal';
 
 const DOW_OPTIONS = [
   { value: '1', label: 'Пн' },
@@ -31,7 +32,6 @@ export interface ScheduleFormModalProps {
   onUpdateSlot: (index: number, patch: Partial<ScheduleSlotFormValues>) => void;
   onAddSlot: () => void;
   onRemoveSlot: (index: number) => void;
-  dismissOnOverlayClick?: boolean;
 }
 
 function invalidClass(fieldErrors: Record<string, string>, field: string) {
@@ -58,25 +58,35 @@ export function ScheduleFormModal({
   onUpdateSlot,
   onAddSlot,
   onRemoveSlot,
-  dismissOnOverlayClick = false,
 }: ScheduleFormModalProps) {
   const { homeIata } = useAirportConfig();
-  if (!open) return null;
 
   const ic = (field: string) => invalidClass(fieldErrors, field);
 
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onClick={dismissOnOverlayClick ? e => { if (e.target === e.currentTarget) onClose(); } : undefined}
+    <Modal
+      open={open}
+      onClose={onClose}
+      titleId={titleId}
+      size="form"
+      closeOnBackdrop={false}
+      header={
+        <>
+          <h3 id={titleId}>{title}</h3>
+          {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
+        </>
+      }
+      footer={
+        <div className="modal-actions modal-actions--center">
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={saving}>
+            Отмена
+          </button>
+          <button type="button" className="btn-primary" disabled={saving} onClick={onSubmit}>
+            {saving ? pendingLabel : submitLabel}
+          </button>
+        </div>
+      }
     >
-      <div className="modal-card modal-card--form" onClick={e => e.stopPropagation()}>
-        <h3 id={titleId}>{title}</h3>
-        {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
-
         <div className="modal-form-grid">
           <div className="modal-field">
             <span className="modal-field__label">Номер рейса</span>
@@ -277,16 +287,6 @@ export function ScheduleFormModal({
             )}
           </div>
         </div>
-
-        <div className="modal-actions modal-actions--center">
-          <button type="button" className="btn-ghost" onClick={onClose} disabled={saving}>
-            Отмена
-          </button>
-          <button type="button" className="btn-primary" disabled={saving} onClick={onSubmit}>
-            {saving ? pendingLabel : submitLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,6 +1,7 @@
 import type { ScheduleRs } from '../../../types';
 import { isoDayOfWeekFromDate, isoDayOfWeekLabel, todayAirportDate } from '../../../utils/airportTime';
 import { slotOptionLabel } from '../domain/flightFormatters';
+import { Modal } from '../../../shared/components/Modal';
 
 export interface CreateSlotOption {
   slotId: number;
@@ -44,7 +45,6 @@ export function FlightCreateModal({
   onClose,
   onSubmit,
 }: FlightCreateModalProps) {
-  if (!open) return null;
   const today = todayAirportDate();
   const minOperationDate = selectedCreateSlot?.schedule.effectiveFrom
     && selectedCreateSlot.schedule.effectiveFrom > today
@@ -52,13 +52,37 @@ export function FlightCreateModal({
     : today;
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="flight-create-title">
-      <div className="modal-card">
-        <h3 id="flight-create-title">Добавить новый рейс</h3>
-        {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
-        <p className="modal-hint modal-hint--compact">
-          Выберите слот шаблона и дату операции — рейс будет создан на эту дату.
-        </p>
+    <Modal
+      open={open}
+      onClose={onClose}
+      titleId="flight-create-title"
+      closeOnBackdrop={false}
+      closeOnEscape
+      header={
+        <>
+          <h3 id="flight-create-title">Добавить новый рейс</h3>
+          {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
+          <p className="modal-hint modal-hint--compact">
+            Выберите слот шаблона и дату операции — рейс будет создан на эту дату.
+          </p>
+        </>
+      }
+      footer={
+        <div className="modal-actions modal-actions--center">
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={createSaving}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={createSaving || availableSlots.length === 0}
+            onClick={onSubmit}
+          >
+            {createSaving ? 'Создание…' : 'Создать'}
+          </button>
+        </div>
+      }
+    >
         <label>
           Шаблон (фильтр)
           <select
@@ -99,21 +123,7 @@ export function FlightCreateModal({
         </label>
         {createDateHint && <p className="modal-hint">{createDateHint}</p>}
         {availableSlots.length === 0 && <p className="modal-alert">Нет доступных слотов.</p>}
-        <div className="modal-actions modal-actions--center">
-          <button type="button" className="btn-ghost" onClick={onClose} disabled={createSaving}>
-            Отмена
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={createSaving || availableSlots.length === 0}
-            onClick={onSubmit}
-          >
-            {createSaving ? 'Создание…' : 'Создать'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

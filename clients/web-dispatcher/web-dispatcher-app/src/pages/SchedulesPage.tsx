@@ -5,6 +5,7 @@ import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import {
   createSchedule,
   deleteSchedule,
+  downloadScheduleExport,
   getAirlines,
   getFilteredSchedules,
   getSchedules,
@@ -32,6 +33,7 @@ import {
   scheduleToForm,
 } from '../features/schedules/scheduleFormMappers';
 import { ScheduleFormModal } from '../features/schedules/components/ScheduleFormModal';
+import { ConfirmDialog } from '../shared/components/ConfirmDialog';
 
 function formatSlotSummary(slot: ScheduleSlotRs, periodicityType?: PeriodicityType): string {
   const dow = periodicityType === 'INTERVAL' ? '' : `${isoDayOfWeekLabel(slot.dayOfWeek)} `;
@@ -90,6 +92,9 @@ export default function SchedulesPage() {
     scheduleId: number;
     flightNumber: string;
   } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [exportInfo, setExportInfo] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setPageError(null);
@@ -269,14 +274,33 @@ export default function SchedulesPage() {
     }
   }
 
-  async function remove(id: number) {
-    if (!confirm('Удалить расписание?')) return;
+  async function handleExport(format: 'pdf' | 'excel') {
+    const exportDate = filterDate || todayAirportDate();
+    if (!filterDate) {
+      setExportInfo(`Экспорт на ${exportDate} (MSK). Для другого дня выберите дату в фильтре.`);
+    } else {
+      setExportInfo(null);
+    }
+    try {
+      await downloadScheduleExport(format, exportDate);
+    } catch (e: unknown) {
+      setPageError(formatApiError(e));
+    }
+  }
+
+  async function confirmRemove() {
+    if (pendingDeleteId == null) return;
+    const id = pendingDeleteId;
+    setDeleteSaving(true);
     try {
       await deleteSchedule(id);
       if (editingId === id) closeEditModal();
       load();
+      setPendingDeleteId(null);
     } catch (e: unknown) {
       setPageError(formatApiError(e));
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -347,7 +371,16 @@ export default function SchedulesPage() {
         onUpdateSlot={updateSlot}
         onAddSlot={addSlot}
         onRemoveSlot={removeSlot}
-        dismissOnOverlayClick
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Удалить расписание?"
+        message="Действие необратимо."
+        variant="danger"
+        busy={deleteSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmRemove()}
       />
 
       <div className="form-row schedules-toolbar">
@@ -385,15 +418,30 @@ export default function SchedulesPage() {
         <button type="button" className="btn-primary btn-sm" onClick={openCreateModal}>
           Добавить
         </button>
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          title="Экспорт расписания на выбранный день (PDF)"
+          onClick={() => void handleExport('pdf')}
+        >
+          Экспорт расписания: PDF
+        </button>
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          title="Экспорт расписания на выбранный день (Excel)"
+          onClick={() => void handleExport('excel')}
+        >
+          Экспорт расписания: Excel
+        </button>
         <p className="filter-date-hint">
           Шаблон расписания → слот (день/время) → рейс на дату (статус SCHEDULED/DEPARTED/… только у рейса).
           {' '}
-          Экспорт операционного расписания на день (PDF/Excel) — на странице «Рейсы».
-          {' '}
           {filterDate
-            ? `Показаны шаблоны с рейсом на ${filterDate} (MSK).`
-            : 'Фильтр по дате не задан — все шаблоны.'}
+            ? `Показаны шаблоны с рейсом на ${filterDate} (MSK). Экспорт итогового расписания на ${filterDate}.`
+            : `Фильтр по дате не задан — все шаблоны. Экспорт итогового расписания на ${todayAirportDate()}, если не выбрать дату.`}
         </p>
+        {exportInfo && <p className="filter-date-hint">{exportInfo}</p>}
       </div>
 
       <table className="data-table">
@@ -420,7 +468,7 @@ export default function SchedulesPage() {
               <td>{s.airline?.name ?? '—'}</td>
               <td className="cell-actions">
                 <button type="button" className="btn-ghost btn-sm" onClick={() => openEditModal(s)}>✏</button>
-                <button type="button" className="btn-danger btn-sm" onClick={() => void remove(s.scheduleId)}>✕</button>
+                <button type="button" className="btn-danger btn-sm" onClick={() => setPendingDeleteId(s.scheduleId)}>✕</button>
               </td>
             </tr>
           ))}

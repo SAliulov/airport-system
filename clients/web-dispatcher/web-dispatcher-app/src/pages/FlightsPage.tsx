@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ConnectionStatusBanner } from '../../../../shared/components/ConnectionStatusBanner';
+import { ConfirmDialog } from '../shared/components/ConfirmDialog';
 import PageStatus from '../components/PageStatus';
 import { FlightCreateModal } from '../features/flights/components/FlightCreateModal';
 import { FlightEditModal } from '../features/flights/components/FlightEditModal';
@@ -16,7 +18,6 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import {
   deleteFlight,
-  downloadScheduleExport,
   getAirlines,
   getAircraftTypes,
   getGates,
@@ -45,7 +46,8 @@ export default function FlightsPage() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const debouncedSearch = useDebouncedValue(searchQuery.trim(), 400);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [exportInfo, setExportInfo] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 const [notification, setNotification] = useState<string | null>(null);
 const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -79,7 +81,7 @@ const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     setAircraftTypes,
   });
 
-  useFlightWebSocket({
+  const { connected } = useFlightWebSocket({
     setFlights,
     highlight,
     editingDetailRef: edit.editingDetailRef,
@@ -108,28 +110,19 @@ const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const waitingForServer = useRetryWhenBackendUp(pageError, setPageError, () => load());
 
-  async function handleExport(format: 'pdf' | 'excel') {
-    const exportDate = filterDate || todayAirportDate();
-    if (!filterDate) {
-      setExportInfo(`Экспорт на ${exportDate} (MSK). Для другого дня выберите дату в фильтре.`);
-    } else {
-      setExportInfo(null);
-    }
-    try {
-      await downloadScheduleExport(format, exportDate);
-    } catch (e: unknown) {
-      setPageError(formatApiError(e));
-    }
-  }
-
-  async function removeFlight(id: number) {
-    if (!confirm('Удалить рейс?')) return;
+  async function confirmRemoveFlight() {
+    if (pendingDeleteId == null) return;
+    const id = pendingDeleteId;
+    setDeleteSaving(true);
     try {
       await deleteFlight(id);
       if (edit.editingId === id) edit.cancelEdit();
       load();
+      setPendingDeleteId(null);
     } catch (e: unknown) {
       setPageError(formatApiError(e));
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -165,6 +158,7 @@ const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         </span>
       </h1>
       <PageStatus error={pageError} waitingForServer={waitingForServer} />
+      <ConnectionStatusBanner connected={connected} />
 
       {notification && (
         <div className="page-notification" role="status">
@@ -240,7 +234,27 @@ const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         schedules={schedules}
         onClose={() => modals.setGenerateModalOpen(false)}
         onSubmit={() => void modals.submitGenerate()}
-        onBulkDeleteBySchedule={() => void modals.submitBulkDeleteBySchedule()}
+        onBulkDeleteBySchedule={modals.requestBulkDeleteBySchedule}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Удалить рейс?"
+        message="Действие необратимо."
+        variant="danger"
+        busy={deleteSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmRemoveFlight()}
+      />
+
+      <ConfirmDialog
+        open={modals.bulkDeleteConfirmLabel != null}
+        title={`Удалить все рейсы шаблона ${modals.bulkDeleteConfirmLabel ?? ''}?`}
+        message="Уже вылетевшие/прибывшие рейсы сервер не удалит."
+        variant="danger"
+        busy={modals.bulkDeleteSaving}
+        onCancel={modals.cancelBulkDeleteConfirm}
+        onConfirm={() => void modals.confirmBulkDeleteBySchedule()}
       />
 
       {edit.editingId != null && edit.editDetail && (
@@ -287,15 +301,13 @@ const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         sortOrder={sortOrder}
         onSortOrderToggle={() => setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))}
         airlines={airlines}
-        exportInfo={exportInfo}
-        onExport={format => void handleExport(format)}
         onOpenCreate={() => void modals.openCreateModal()}
         onOpenGenerate={modals.openGenerateModal}
         flights={flights}
         editingId={edit.editingId}
         highlightIds={highlightIds}
         onStartEdit={flight => void edit.startEdit(flight)}
-        onRemoveFlight={id => void removeFlight(id)}
+        onRemoveFlight={id => setPendingDeleteId(id)}
         page={page}
         totalPages={totalPages}
         totalElements={totalElements}

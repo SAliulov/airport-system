@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAirportConfig } from '../../../shared/context/AirportConfigProvider';
+import { ConnectionStatusBanner } from '../../../shared/components/ConnectionStatusBanner';
 import { fetchAirlines, fetchGates } from './api';
 import { FilterBar } from './components/FilterBar';
 import { FlightTable } from './components/FlightTable';
@@ -27,7 +28,7 @@ export default function App() {
   const board = useBoardFlights({ filters, debouncedSearch, airportToday });
   const { highlightIds, highlight } = useFlightHighlight();
 
-  useFlightsRealtime({ setFlights: board.setFlights, highlight });
+  const { connected } = useFlightsRealtime({ setFlights: board.setFlights, highlight });
 
   useEffect(() => {
     fetchAirlines()
@@ -56,6 +57,8 @@ export default function App() {
         </div>
         <div className="board-clock">{timeLabel}</div>
       </header>
+
+      <ConnectionStatusBanner connected={connected} />
 
       <FilterBar
         filters={filters}

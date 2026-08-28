@@ -1,5 +1,6 @@
 import type { ScheduleRs } from '../../../types';
 import { todayAirportDate } from '../../../utils/airportTime';
+import { Modal } from '../../../shared/components/Modal';
 
 export interface FlightGenerateModalProps {
   open: boolean;
@@ -35,19 +36,46 @@ export function FlightGenerateModal({
   onSubmit,
   onBulkDeleteBySchedule,
 }: FlightGenerateModalProps) {
-  if (!open) return null;
   const today = todayAirportDate();
   const busy = generateSaving || bulkDeleteSaving;
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="flight-generate-title">
-      <div className="modal-card">
-        <h3 id="flight-generate-title">Генерация рейсов</h3>
-        <p className="modal-hint">
-          Создаёт рейсы из активных шаблонов за указанный период. Список рейсов фильтруется по одному
-          дню — после успешной генерации фильтр сбрасывается автоматически.
-        </p>
-        {generateInfo && <p className="modal-alert" role="status">{generateInfo}</p>}
+    <Modal
+      open={open}
+      onClose={onClose}
+      titleId="flight-generate-title"
+      closeOnBackdrop={false}
+      closeOnEscape
+      header={
+        <>
+          <h3 id="flight-generate-title">Генерация рейсов</h3>
+          <p className="modal-hint">
+            Создаёт рейсы из активных шаблонов за указанный период. Список рейсов фильтруется по одному
+            дню — после успешной генерации фильтр сбрасывается автоматически.
+          </p>
+          {generateInfo && <p className="modal-alert" role="status">{generateInfo}</p>}
+        </>
+      }
+      footer={
+        <div className="modal-actions modal-actions--center">
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>
+            Закрыть
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            disabled={busy || !generateScheduleId}
+            onClick={onBulkDeleteBySchedule}
+            title="Удаляет только рейсы выбранного шаблона"
+          >
+            {bulkDeleteSaving ? 'Удаление…' : 'Удалить рейсы шаблона'}
+          </button>
+          <button type="button" className="btn-primary" disabled={busy} onClick={onSubmit}>
+            {generateSaving ? 'Генерация…' : 'Сгенерировать'}
+          </button>
+        </div>
+      }
+    >
         <label>
           С
           <input
@@ -77,24 +105,6 @@ export function FlightGenerateModal({
             ))}
           </select>
         </label>
-        <div className="modal-actions modal-actions--center">
-          <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>
-            Закрыть
-          </button>
-          <button
-            type="button"
-            className="btn-danger"
-            disabled={busy || !generateScheduleId}
-            onClick={onBulkDeleteBySchedule}
-            title="Удаляет только рейсы выбранного шаблона"
-          >
-            {bulkDeleteSaving ? 'Удаление…' : 'Удалить рейсы шаблона'}
-          </button>
-          <button type="button" className="btn-primary" disabled={busy} onClick={onSubmit}>
-            {generateSaving ? 'Генерация…' : 'Сгенерировать'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import PageStatus from '../components/PageStatus';
+import { ConfirmDialog } from '../shared/components/ConfirmDialog';
 import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import { createAircraftType, deleteAircraftType, getAircraftTypes, updateAircraftType } from '../services/api';
 import type { AircraftTypeRs } from '../types';
@@ -14,6 +15,8 @@ export default function AircraftTypesPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   const load = useCallback(() => {
     setPageError(null);
@@ -52,14 +55,19 @@ export default function AircraftTypesPage() {
     }
   }
 
-  async function remove(id: number) {
-    if (!confirm('Удалить тип ВС?')) return;
+  async function confirmRemove() {
+    if (pendingDeleteId == null) return;
+    const id = pendingDeleteId;
     setPageError(null);
+    setDeleteSaving(true);
     try {
       await deleteAircraftType(id);
       load();
+      setPendingDeleteId(null);
     } catch (e: unknown) {
       setPageError(formatApiError(e));
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -140,12 +148,21 @@ export default function AircraftTypesPage() {
               <td>{a.sizeCategory ?? '—'}</td>
               <td className="cell-actions">
                 <button className="btn-ghost btn-sm" onClick={() => startEdit(a)}>✏</button>
-                <button className="btn-danger btn-sm" onClick={() => remove(a.aircraftTypeId)}>✕</button>
+                <button className="btn-danger btn-sm" onClick={() => setPendingDeleteId(a.aircraftTypeId)}>✕</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Удалить тип ВС?"
+        message="Действие необратимо."
+        variant="danger"
+        busy={deleteSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmRemove()}
+      />
     </div>
   );
 }

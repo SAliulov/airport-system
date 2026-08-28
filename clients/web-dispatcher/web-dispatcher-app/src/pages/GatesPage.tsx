@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import PageStatus from '../components/PageStatus';
+import { ConfirmDialog } from '../shared/components/ConfirmDialog';
 import { useRetryWhenBackendUp } from '../hooks/useRetryWhenBackendUp';
 import { createGate, deleteGate, getGates, updateGate } from '../services/api';
 import type { GateRs } from '../types';
@@ -14,6 +15,8 @@ export default function GatesPage() {
   const [editing, setEditing] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   const load = useCallback(() => {
     setPageError(null);
@@ -52,14 +55,19 @@ export default function GatesPage() {
     }
   }
 
-  async function remove(id: number) {
-    if (!confirm('Удалить гейт?')) return;
+  async function confirmRemove() {
+    if (pendingDeleteId == null) return;
+    const id = pendingDeleteId;
     setPageError(null);
+    setDeleteSaving(true);
     try {
       await deleteGate(id);
       load();
+      setPendingDeleteId(null);
     } catch (e: unknown) {
       setPageError(formatApiError(e));
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -147,12 +155,21 @@ export default function GatesPage() {
               <td>{g.isActive ? '✓' : '—'}</td>
               <td className="cell-actions">
                 <button className="btn-ghost btn-sm" onClick={() => startEdit(g)}>✏</button>
-                <button className="btn-danger btn-sm" onClick={() => remove(g.gateId)}>✕</button>
+                <button className="btn-danger btn-sm" onClick={() => setPendingDeleteId(g.gateId)}>✕</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Удалить гейт?"
+        message="Действие необратимо."
+        variant="danger"
+        busy={deleteSaving}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmRemove()}
+      />
     </div>
   );
 }

@@ -17,6 +17,15 @@ body {
 /* ─── Page ─────────────────────────────────────────────── */
 .page h1 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
 .page-error { color: var(--danger); margin-bottom: 8px; }
+.connection-status-banner {
+  background: rgba(249, 168, 37, 0.12);
+  border: 1px solid rgba(249, 168, 37, 0.4);
+  color: var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
 .page-reconnect-hint {
   color: var(--muted);
   font-size: 12px;

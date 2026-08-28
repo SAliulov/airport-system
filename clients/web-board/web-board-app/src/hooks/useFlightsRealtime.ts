@@ -68,5 +68,5 @@ export function useFlightsRealtime({ setFlights, highlight }: FlightsRealtimeOpt
     [highlight, setFlights],
   );
 
-  useStomp([...BOARD_WS_TOPICS], handleMessage);
+  return useStomp([...BOARD_WS_TOPICS], handleMessage);
 }
