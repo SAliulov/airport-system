@@ -1,5 +1,6 @@
 import type { AircraftTypeRs, FlightRs, GateRs, SizeCategory } from '../../../types';
 import { useAirportConfig } from '../../../../../../shared/context/AirportConfigProvider';
+import { Modal } from '../../../shared/components/Modal';
 import { toDatetimeLocalValue } from '../../../utils/airportTime';
 import {
   allowedStatusOptions,
@@ -81,26 +82,36 @@ export function FlightEditModal({
   const showActualFields = editDetail.status === 'SCHEDULED' || editDetail.status === 'DELAYED';
 
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="flight-edit-title"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <Modal
+      open
+      onClose={onClose}
+      titleId="flight-edit-title"
+      size="edit"
+      closeOnBackdrop={false}
+      header={
+        <>
+          <h3 id="flight-edit-title">
+            {actualTimesOnly ? 'Коррекция времени' : 'Редактирование'} рейса #{editingId} — {editDetail.schedule?.flightNumber ?? '—'}
+          </h3>
+          {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
+          <p className="modal-hint">
+            {actualTimesOnly
+              ? 'Исправьте фактическое время вылета и/или прилёта. Остальные параметры рейса закрыты.'
+              : 'Заполните нужные поля и нажмите «Применить изменения».'}
+          </p>
+        </>
+      }
+      footer={
+        <div className="modal-actions modal-actions--footer">
+          <button type="button" className="btn-ghost" onClick={onClose} disabled={editSaving}>
+            Закрыть
+          </button>
+          <button type="button" className="btn-primary" disabled={editSaving} onClick={onApply}>
+            {editSaving ? 'Сохранение…' : 'Применить изменения'}
+          </button>
+        </div>
+      }
     >
-      <div className="modal-card modal-card--edit" onClick={e => e.stopPropagation()}>
-        <h3 id="flight-edit-title">
-          {actualTimesOnly ? 'Коррекция времени' : 'Редактирование'} рейса #{editingId} — {editDetail.schedule?.flightNumber ?? '—'}
-        </h3>
-        {modalError && <p className="modal-alert" role="alert">{modalError}</p>}
-        <p className="modal-hint">
-          {actualTimesOnly
-            ? 'Исправьте фактическое время вылета и/или прилёта. Остальные параметры рейса закрыты.'
-            : 'Заполните нужные поля и нажмите «Применить изменения».'}
-        </p>
-        <div className="modal-card__body">
           <section className="panel-section panel-section--bordered">
             <h3 className="panel-section__title">Расписание</h3>
             <p className="modal-readonly">{flightScheduleLabel(editDetail)}</p>
@@ -346,17 +357,6 @@ export function FlightEditModal({
               )}
             </>
           )}
-        </div>
-
-        <div className="modal-actions modal-actions--footer">
-          <button type="button" className="btn-ghost" onClick={onClose} disabled={editSaving}>
-            Закрыть
-          </button>
-          <button type="button" className="btn-primary" disabled={editSaving} onClick={onApply}>
-            {editSaving ? 'Сохранение…' : 'Применить изменения'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
