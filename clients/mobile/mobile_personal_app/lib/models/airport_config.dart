@@ -11,13 +11,4 @@ class AirportConfig {
     required this.gatePlanWindowHours,
     required this.gatePostGraceMinutes,
   });
-
-  factory AirportConfig.fromJson(Map<String, dynamic> json) {
-    return AirportConfig(
-      homeIata: (json['homeIata'] as String).trim().toUpperCase(),
-      timezone: json['timezone'] as String,
-      gatePlanWindowHours: (json['gatePlanWindowHours'] as num).toInt(),
-      gatePostGraceMinutes: (json['gatePostGraceMinutes'] as num).toInt(),
-    );
-  }
 }

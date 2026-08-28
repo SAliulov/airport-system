@@ -22,7 +22,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _serverCtrl = TextEditingController();
   bool _loading = false;
   bool _configReady = false;
   String? _error;
@@ -37,7 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
     await AppConfig.ensureLoaded();
     if (mounted) {
       setState(() {
-        _serverCtrl.text = AppConfig.apiBase;
         _configReady = true;
       });
     }
@@ -49,7 +47,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await AppConfig.setApiBase(_serverCtrl.text.trim());
       await AppScope.of(context).auth.login(
         _userCtrl.text.trim(),
         _passCtrl.text,
@@ -68,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _userCtrl.dispose();
     _passCtrl.dispose();
-    _serverCtrl.dispose();
     super.dispose();
   }
 
@@ -117,17 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                 ),
                 const SizedBox(height: 28),
-                TextField(
-                  controller: _serverCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Адрес сервера',
-                    hintText: 'https://45.133.74.67',
-                    prefixIcon: Icon(Icons.dns),
-                  ),
-                  keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
                 TextField(
                   controller: _userCtrl,
                   decoration: const InputDecoration(

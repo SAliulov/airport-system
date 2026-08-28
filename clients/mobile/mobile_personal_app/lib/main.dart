@@ -9,15 +9,17 @@ import 'services/airport_api.dart';
 import 'services/stomp_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_shell.dart';
-import 'widgets/airport_config_gate.dart';
+
+const _defaultAirportConfig = AirportConfig(
+  homeIata: 'SVO',
+  timezone: 'Europe/Moscow',
+  gatePlanWindowHours: 12,
+  gatePostGraceMinutes: 15,
+);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    AirportConfigGate(
-      builder: (airportConfig) => AirportApp(airportConfig: airportConfig),
-    ),
-  );
+  runApp(const AirportApp(airportConfig: _defaultAirportConfig));
 }
 
 class AirportApp extends StatefulWidget {

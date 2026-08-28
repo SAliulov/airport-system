@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Конфигурация подключения к backend (runtime + compile-time override).
 class AppConfig {
   static const String _prefsKey = 'api_base';
-  static const String defaultApiBase = 'https://45.133.74.67';
+  static const String defaultApiBase = 'http://localhost:8080';
 
   static String _apiBase = defaultApiBase;
   static bool _loaded = false;
