@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/di/app_scope.dart';
 import '../core/errors/error_message.dart';
+import '../models/delay_warning.dart';
 import '../models/flight_detail.dart';
 import '../models/gate_assignment.dart';
 import '../models/realtime_event.dart';
@@ -75,8 +76,9 @@ class _FlightLookupScreenState extends State<FlightLookupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${e.title}: ${e.subtitle}')),
       );
-      if (e.payload != null) {
-        _patchFlight(e.payload!);
+      final warningJson = e.payload?['warning'] as Map<String, dynamic>?;
+      if (warningJson != null) {
+        _patchDelay(e.flightId, warningJson, e.payload!['eventType'] as String?);
       } else {
         _setStatusDelayed(e.flightId);
       }
@@ -103,6 +105,18 @@ class _FlightLookupScreenState extends State<FlightLookupScreen> {
     final idx = _flights.indexWhere((f) => f.flightId == id);
     if (idx < 0) return;
     setState(() => _flights[idx] = _flights[idx].mergeFromRealtime(json));
+  }
+
+  void _patchDelay(int flightId, Map<String, dynamic> warningJson, String? eventType) {
+    final idx = _flights.indexWhere((f) => f.flightId == flightId);
+    if (idx < 0) return;
+    final warning = DelayWarning.fromJson(warningJson);
+    final updated = List<DelayWarning>.from(_flights[idx].delayWarnings)
+      ..removeWhere((w) => w.warningId == warning.warningId);
+    if (eventType != 'DELETED') updated.add(warning);
+    setState(() {
+      _flights[idx] = _flights[idx].copyWith(delayWarnings: updated);
+    });
   }
 
   void _patchGate(int flightId, Map<String, dynamic> assignment) {

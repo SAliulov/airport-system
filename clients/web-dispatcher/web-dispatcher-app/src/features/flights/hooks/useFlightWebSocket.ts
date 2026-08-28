@@ -72,6 +72,7 @@ export function useFlightWebSocket({
                     status: (msg.status as FlightStatus | undefined) ?? fl.status,
                     actualDeparture: (msg.actualDeparture as string | undefined) ?? fl.actualDeparture,
                     actualArrival: (msg.actualArrival as string | undefined) ?? fl.actualArrival,
+                    aircraftType: (msg.aircraftType as FlightRs['aircraftType'] | undefined) ?? fl.aircraftType,
                   }
                 : fl,
             ),
@@ -106,5 +107,5 @@ export function useFlightWebSocket({
     [highlight, onDetailRefresh, setFlights, editingDetailRef, onOperationalEvent],
   );
 
-  useStomp([...FLIGHT_WS_TOPICS], handleWsMessage);
+  return useStomp([...FLIGHT_WS_TOPICS], handleWsMessage);
 }

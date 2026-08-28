@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/delay_warning.dart';
 import '../models/flight_detail.dart';
 import '../models/gate_assignment.dart';
 import '../models/realtime_event.dart';
@@ -61,6 +62,18 @@ class _FlightDetailScreenState extends State<FlightDetailScreen> {
           _flight = _flight!.copyWith(
             currentGateAssignment: GateAssignment.fromJson(assignment),
           );
+          return;
+        }
+      }
+      if (e.type == EventType.delay) {
+        final warningJson = e.payload!['warning'] as Map<String, dynamic>?;
+        if (warningJson != null && _flight != null) {
+          final warning = DelayWarning.fromJson(warningJson);
+          final eventType = e.payload!['eventType'] as String?;
+          final updated = List<DelayWarning>.from(_flight!.delayWarnings)
+            ..removeWhere((w) => w.warningId == warning.warningId);
+          if (eventType != 'DELETED') updated.add(warning);
+          _flight = _flight!.copyWith(delayWarnings: updated);
           return;
         }
       }
