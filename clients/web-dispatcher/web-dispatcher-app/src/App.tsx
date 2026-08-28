@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import FlightsPage from './pages/FlightsPage';
 import SchedulesPage from './pages/SchedulesPage';
+import DelayWarningsPage from './pages/DelayWarningsPage';
 import AirlinesPage from './pages/AirlinesPage';
 import AircraftTypesPage from './pages/AircraftTypesPage';
 import GatesPage from './pages/GatesPage';
@@ -41,6 +42,7 @@ export default function App() {
         <Route index element={<Navigate to="/flights" replace />} />
         <Route path="flights" element={<FlightsPage />} />
         <Route path="schedules" element={<SchedulesPage />} />
+        <Route path="delay-warnings" element={<DelayWarningsPage />} />
         <Route path="airlines" element={<AirlinesPage />} />
         <Route path="aircraft-types" element={<AircraftTypesPage />} />
         <Route path="gates" element={<GatesPage />} />

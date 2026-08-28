@@ -192,7 +192,7 @@ public class FlightAutoStatusProcessor {
         Flight saved = flightRepository.save(flight);
         var warningRs = dtoMapper.toDelayWarningRs(delayWarningRepository.save(warning));
         realtimeNotificationService.publishFlightUpdate(dtoMapper.toFlightRsSummary(saved));
-        realtimeNotificationService.publishDelayWarning(saved.getFlightId(), warningRs);
+        realtimeNotificationService.publishDelayWarning(saved.getFlightId(), warningRs, "CREATED");
     }
 
     private Flight saved(Flight flight) {

@@ -36,6 +36,8 @@ public class FlightOperationalMessages {
             case "assignGate" -> mapGateAssignment(args, result, username, timestamp, details);
             case "assignAircraft" -> mapAircraftAssignment(result, username, timestamp, details);
             case "addDelayWarning" -> mapDelayWarning(args, result, username, timestamp, details);
+            case "updateDelayWarning" -> mapDelayWarningEdit(result, username, timestamp, details, "изменено");
+            case "deleteDelayWarning" -> mapDelayWarningEdit(result, username, timestamp, details, "отменено");
             case "create" -> mapFlightCreate(result, username, timestamp, details);
             case "generate" -> mapFlightGenerate(args, result, username, timestamp, details);
             case "delete" -> mapFlightDelete(args, username, timestamp, details);
@@ -132,6 +134,31 @@ public class FlightOperationalMessages {
                 trimDetails(details),
                 ctx.flightId(),
                 ctx.flightNumber()));
+    }
+
+    /** Правки/отмена уже существующего предупреждения (вкладка «Задержки») — результат несёт контекст рейса напрямую. */
+    private Optional<OperationalEventPush> mapDelayWarningEdit(
+            Object result,
+            String username,
+            String timestamp,
+            String details,
+            String verb) {
+        if (!(result instanceof DelayWarningRs warning)) {
+            return Optional.empty();
+        }
+        String fn = warning.getFlightNumber() != null ? warning.getFlightNumber() : "#" + warning.getFlightId();
+        String reason = warning.getReason() != null && !warning.getReason().isBlank()
+                ? " — " + warning.getReason()
+                : "";
+        return Optional.of(new OperationalEventPush(
+                timestamp,
+                username,
+                OperationalEventCategory.DELAY,
+                "Предупреждение о задержке рейса %s %s: %d мин%s".formatted(
+                        fn, verb, warning.getDelayMinutes(), reason),
+                trimDetails(details),
+                warning.getFlightId(),
+                fn));
     }
 
     private Optional<OperationalEventPush> mapFlightCreate(

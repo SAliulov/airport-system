@@ -94,12 +94,25 @@ public class FlightDtoMapper {
     }
 
     public DelayWarningRs toDelayWarningRs(DelayWarning d) {
-        return DelayWarningRs.builder()
+        DelayWarningRs.DelayWarningRsBuilder builder = DelayWarningRs.builder()
                 .warningId(d.getWarningId())
                 .delayMinutes(d.getDelayMinutes())
                 .reason(d.getReason())
-                .createdAt(d.getCreatedAt())
-                .build();
+                .createdAt(d.getCreatedAt());
+
+        Flight flight = d.getFlight();
+        if (flight != null) {
+            builder.flightId(flight.getFlightId())
+                    .scheduledDeparture(flight.getScheduledDeparture())
+                    .flightStatus(flight.getStatus());
+            Schedule schedule = flight.getSchedule();
+            if (schedule != null) {
+                builder.flightNumber(schedule.getFlightNumber())
+                        .originAirport(schedule.getOriginAirport())
+                        .destinationAirport(schedule.getDestinationAirport());
+            }
+        }
+        return builder.build();
     }
 
     public GateTimelineSegmentRs toTimelineSegment(GateAssignment ga) {

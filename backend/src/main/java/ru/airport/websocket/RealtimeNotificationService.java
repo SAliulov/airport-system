@@ -12,6 +12,7 @@ import ru.airport.event.FlightDeletedEvent;
 import ru.airport.event.FlightUpdateEvent;
 import ru.airport.event.GateChangeEvent;
 import ru.airport.event.OperationalEvent;
+import ru.airport.service.OperationalEventService;
 import ru.airport.websocket.payload.OperationalEventPush;
 
 /**
@@ -22,6 +23,7 @@ import ru.airport.websocket.payload.OperationalEventPush;
 public class RealtimeNotificationService {
 
     private final ApplicationEventPublisher eventPublisher;
+    private final OperationalEventService operationalEventService;
 
     public void publishFlightUpdate(FlightRs flight) {
         eventPublisher.publishEvent(new FlightUpdateEvent(flight));
@@ -35,8 +37,8 @@ public class RealtimeNotificationService {
         eventPublisher.publishEvent(new FlightDeletedEvent(flightId));
     }
 
-    public void publishDelayWarning(Integer flightId, DelayWarningRs warning) {
-        eventPublisher.publishEvent(new DelayWarningEvent(flightId, warning));
+    public void publishDelayWarning(Integer flightId, DelayWarningRs warning, String eventType) {
+        eventPublisher.publishEvent(new DelayWarningEvent(flightId, warning, eventType));
     }
 
     public void publishGateChange(Integer flightId, GateAssignmentRs assignment) {
@@ -45,5 +47,6 @@ public class RealtimeNotificationService {
 
     public void publishOperationalEvent(OperationalEventPush event) {
         eventPublisher.publishEvent(new OperationalEvent(event));
+        operationalEventService.persist(event);
     }
 }

@@ -4,6 +4,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import ru.airport.config.AirportClock;
+import ru.airport.service.DelayWarningService;
 import ru.airport.service.FlightService;
 import ru.airport.service.ScheduleService;
 import ru.airport.websocket.payload.OperationalEventPush;
@@ -47,7 +48,8 @@ public class OperationalEventMapper {
         String methodName = methodSig.getMethod().getName();
         String timestamp = airportClock.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
-        if (FlightService.class.isAssignableFrom(serviceClass)) {
+        if (FlightService.class.isAssignableFrom(serviceClass)
+                || DelayWarningService.class.isAssignableFrom(serviceClass)) {
             return flightMessages.map(methodName, args, result, username, timestamp, details);
         }
         if (ScheduleService.class.isAssignableFrom(serviceClass)) {

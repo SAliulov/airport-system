@@ -43,6 +43,12 @@ export interface DelayWarningRs {
   delayMinutes: number;
   reason?: string;
   createdAt?: string;
+  flightId?: number;
+  flightNumber?: string;
+  originAirport?: string;
+  destinationAirport?: string;
+  scheduledDeparture?: string;
+  flightStatus?: FlightStatus;
 }
 
 export interface ScheduleSlotRs {

@@ -7,6 +7,7 @@ import { brandingLogoUrl } from '../utils/branding';
 const NAV = [
   { to: '/flights', label: 'Рейсы' },
   { to: '/schedules', label: 'Плановое расписание' },
+  { to: '/delay-warnings', label: 'Задержки' },
   { to: '/airlines', label: 'Авиакомпании' },
   { to: '/aircraft-types', label: 'Типы ВС' },
   { to: '/gates', label: 'Гейты' },

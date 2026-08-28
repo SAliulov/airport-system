@@ -57,7 +57,7 @@ public class WebSocketEventListener {
     public void onDelayWarning(DelayWarningEvent event) {
         messagingTemplate.convertAndSend(
                 "/topic/delays",
-                new DelayWarningPush(event.flightId(), event.warningRs())
+                new DelayWarningPush(event.flightId(), event.warningRs(), event.eventType())
         );
     }
 

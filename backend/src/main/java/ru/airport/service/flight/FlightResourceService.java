@@ -153,7 +153,7 @@ public class FlightResourceService {
         delayWarningBusinessRules.assertMayAddManualDelayWarning(flight.getStatus());
         var entity = mapper.newDelayWarning(rq, flight, airportClock.now());
         DelayWarningRs rs = mapper.toDelayWarningRs(delayWarningRepository.save(entity));
-        realtimeNotificationService.publishDelayWarning(flightId, rs);
+        realtimeNotificationService.publishDelayWarning(flightId, rs, "CREATED");
         return rs;
     }
 }

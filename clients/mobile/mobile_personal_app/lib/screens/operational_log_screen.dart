@@ -18,6 +18,7 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
   String _query = '';
   List<OperationalEvent> _filteredLogs = const [];
   bool _listenerAttached = false;
+  bool _loadingHistory = false;
 
   @override
   void didChangeDependencies() {
@@ -25,6 +26,7 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
     if (!_listenerAttached) {
       _listenerAttached = true;
       AppScope.of(context).stomp.addOperationalListener(_onOperationalEvent);
+      _loadHistory();
     }
   }
 
@@ -62,7 +64,8 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
         .where(
           (e) =>
               e.message.toLowerCase().contains(_query) ||
-              e.user.toLowerCase().contains(_query),
+              e.user.toLowerCase().contains(_query) ||
+              (e.flightNumber?.toLowerCase().contains(_query) ?? false),
         )
         .toList(growable: false);
   }
@@ -76,6 +79,34 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
       }
       _recomputeFilteredLogs();
     });
+  }
+
+  String _dedupeKey(OperationalEvent e) =>
+      '${e.timestamp}|${e.user}|${e.message}|${e.flightId}';
+
+  Future<void> _loadHistory() async {
+    setState(() => _loadingHistory = true);
+    try {
+      final history = await AppScope.of(context).api.getOperationalEvents(size: 100);
+      if (!mounted) return;
+      setState(() {
+        final existingKeys = _sessionLogs.map(_dedupeKey).toSet();
+        for (final e in history) {
+          if (existingKeys.add(_dedupeKey(e))) {
+            _sessionLogs.add(e);
+          }
+        }
+        _sessionLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        if (_sessionLogs.length > 200) {
+          _sessionLogs.removeRange(200, _sessionLogs.length);
+        }
+        _recomputeFilteredLogs();
+      });
+    } catch (_) {
+      // молча игнорируем — живой канал (WS) продолжит наполнять список
+    } finally {
+      if (mounted) setState(() => _loadingHistory = false);
+    }
   }
 
   Future<void> _confirmClear() async {
@@ -113,6 +144,11 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
       appBar: AppBar(
         title: const Text('Журнал'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadingHistory ? null : _loadHistory,
+            tooltip: 'Обновить',
+          ),
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: _confirmClear, tooltip: 'Очистить'),
         ],
       ),
@@ -142,13 +178,16 @@ class _OperationalLogScreenState extends State<OperationalLogScreen> {
                       style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    itemCount: logs.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _OperationalLogTile(
-                      event: logs[i],
-                      formatTime: _formatTime,
+                : RefreshIndicator(
+                    onRefresh: _loadHistory,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      itemCount: logs.length,
+                      separatorBuilder: (_, index) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) => _OperationalLogTile(
+                        event: logs[i],
+                        formatTime: _formatTime,
+                      ),
                     ),
                   ),
           ),
