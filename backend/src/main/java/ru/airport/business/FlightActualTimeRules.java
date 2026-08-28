@@ -28,10 +28,7 @@ public class FlightActualTimeRules {
             return;
         }
 
-        // 1. Запрет ввода "будущего" времени относительно текущих часов аэропорта
-        assertNotTooFarInFuture(actualDeparture, now, "вылета");
-
-        // 2. Проверка близости к расписанию (мягкие границы)
+        // Проверка близости к расписанию (мягкие границы)
         assertDepartureBounds(actualDeparture, scheduledDeparture, kind);
     }
 
@@ -48,13 +45,10 @@ public class FlightActualTimeRules {
             return;
         }
 
-        // 1. Запрет ввода "будущего" времени относительно текущих часов аэропорта
-        assertNotTooFarInFuture(actualArrival, now, "прилёта");
-
-        // 2. Проверка близости к расписанию (мягкие границы)
+        // Проверка близости к расписанию (мягкие границы)
         assertArrivalBounds(actualArrival, scheduledArrival, kind);
 
-        // 3. Хронологический инвариант: прилёт не может быть раньше вылета
+        // Хронологический инвариант: прилёт не может быть раньше вылета
         if (actualDeparture != null && actualArrival.isBefore(actualDeparture)) {
             throw new BadRequestException(
                     "Фактическое время прилёта не может быть раньше фактического времени вылета");
@@ -117,12 +111,4 @@ public class FlightActualTimeRules {
         }
     }
 
-    private void assertNotTooFarInFuture(LocalDateTime value, LocalDateTime now, String label) {
-        LocalDateTime maxAllowedFutureTime = now.plusMinutes(config.getMaxActualTimeFutureSkewMinutes());
-        if (value.isAfter(maxAllowedFutureTime)) {
-            throw new BadRequestException(String.format(
-                    "Фактическое время %s не может быть более чем на %d мин. в будущем относительно текущего времени аэропорта",
-                    label, config.getMaxActualTimeFutureSkewMinutes()));
-        }
-    }
 }

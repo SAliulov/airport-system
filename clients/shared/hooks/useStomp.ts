@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Client, type IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
@@ -7,32 +7,37 @@ type MessageCallback = (body: string, topic: string) => void;
 function resolveWsUrl(apiBase: string): string {
   if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
     const url = new URL(apiBase);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${url.origin}/ws`;
   }
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/ws`;
+  return `${window.location.protocol}//${window.location.host}/ws`;
 }
 
 /**
  * Подписка на STOMP-топики через SockJS. Callback стабилен через ref.
+ * SockJS сам договаривается о транспорте (в т.ч. о WebSocket) через HTTP-хендшейк,
+ * поэтому ему нужен http(s)://-адрес, а не ws(s)://.
  */
 export function useStomp(apiBase: string, topics: string[], onMessage: MessageCallback) {
   const cbRef = useRef(onMessage);
   cbRef.current = onMessage;
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     const wsUrl = resolveWsUrl(apiBase);
     const client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl) as WebSocket,
+      webSocketFactory: () => new SockJS(wsUrl, undefined, { transports: ['websocket', 'xhr-streaming', 'xhr-polling'] }) as WebSocket,
       reconnectDelay: 5000,
       onConnect: () => {
+        setConnected(true);
         topics.forEach(topic => {
           client.subscribe(topic, (frame: IMessage) => {
             if (frame.body) cbRef.current(frame.body, topic);
           });
         });
       },
+      onDisconnect: () => setConnected(false),
+      onWebSocketClose: () => setConnected(false),
+      onStompError: () => setConnected(false),
     });
     client.activate();
     return () => {
@@ -40,4 +45,6 @@ export function useStomp(apiBase: string, topics: string[], onMessage: MessageCa
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- topics fixed at mount
   }, [apiBase]);
+
+  return { connected };
 }

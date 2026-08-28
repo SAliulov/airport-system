@@ -35,7 +35,6 @@ public class AirportProperties {
         private int outboundDelayGraceMinutes = 5;
         private int inboundGateDelayMinutes = 5;
         private int autoCancelHoursAfterScheduledDeparture = 24;
-        private int maxActualTimeFutureSkewMinutes = 120;
 
         // Исключаем магические числа: настраиваемые мягкие границы для фактического времени
         private int maxDepartureEarlyHours = 24;

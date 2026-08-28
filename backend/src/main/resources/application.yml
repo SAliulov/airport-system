@@ -52,7 +52,6 @@ airport:
     outbound-delay-grace-minutes: 5
     inbound-gate-delay-minutes: 5
     auto-cancel-hours-after-scheduled-departure: 24
-    max-actual-time-future-skew-minutes: 120
     max-departure-early-hours: 24
     max-departure-late-hours: 48
     max-arrival-early-hours: 24

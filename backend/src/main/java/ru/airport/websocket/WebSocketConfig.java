@@ -31,7 +31,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns(origins)
                 .withSockJS();
         // Raw WebSocket для мобильных клиентов (Flutter).
-        // Нативные приложения не шлют Origin-заголовок, поэтому origin-проверка отключена.
-        registry.addEndpoint("/ws/raw");
+        // Нативные приложения Origin не шлют вовсе, поэтому паттерн их не касается,
+        // а Flutter-web (используется для QA) шлёт Origin и без него хендшейк отклоняется.
+        registry.addEndpoint("/ws/raw")
+                .setAllowedOriginPatterns("*");
     }
 }

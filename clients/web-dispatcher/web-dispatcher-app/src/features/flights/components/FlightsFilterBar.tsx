@@ -20,8 +20,6 @@ export interface FlightsFilterBarProps {
   sortOrder: 'asc' | 'desc';
   onSortOrderToggle: () => void;
   airlines: AirlineRs[];
-  exportInfo: string | null;
-  onExport: (format: 'pdf' | 'excel') => void;
   onOpenCreate: () => void;
   onOpenGenerate: () => void;
   flights: FlightRs[];
@@ -53,8 +51,6 @@ export function FlightsFilterBar({
   sortOrder,
   onSortOrderToggle,
   airlines,
-  exportInfo,
-  onExport,
   onOpenCreate,
   onOpenGenerate,
   flights,
@@ -88,22 +84,6 @@ export function FlightsFilterBar({
         </button>
         <button type="button" className="btn-ghost btn-sm" onClick={() => onFilterDateChange(todayAirportDate())}>
           Сегодня
-        </button>
-        <button
-          type="button"
-          className="btn-ghost btn-sm"
-          title="Экспорт расписания на выбранный день (PDF)"
-          onClick={() => onExport('pdf')}
-        >
-          PDF
-        </button>
-        <button
-          type="button"
-          className="btn-ghost btn-sm"
-          title="Экспорт расписания на выбранный день (Excel)"
-          onClick={() => onExport('excel')}
-        >
-          Excel
         </button>
         <select value={filterStatus} onChange={e => onFilterStatusChange(e.target.value)}>
           <option value="">Все статусы</option>
@@ -146,10 +126,9 @@ export function FlightsFilterBar({
         </button>
         <p className="filter-date-hint">
           {filterDate
-            ? `Показаны рейсы с плановым вылетом ${filterDate} (MSK). Экспорт PDF/Excel — на эту дату.`
-            : 'Все даты: без фильтра по дню. Экспорт — на сегодня (MSK), либо выберите дату.'}
+            ? `Показаны рейсы с плановым вылетом ${filterDate} (MSK).`
+            : 'Все даты: без фильтра по дню.'}
         </p>
-        {exportInfo && <p className="filter-date-hint">{exportInfo}</p>}
       </div>
 
       <PaginationBar
